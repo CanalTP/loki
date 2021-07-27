@@ -41,7 +41,7 @@ use crate::{
     time::days_patterns::{DaysInPatternIter, DaysPattern, DaysPatterns},
 };
 
-use super::{TimetablesIter, VehicleJourneyRemovalError, generic_timetables::{Timetables, Timetable, Vehicle}};
+use super::{TimetablesIter,RemovalError, RemovalSuccess, generic_timetables::{Timetables, Timetable, Vehicle}};
 
 use crate::time::{
     Calendar, DaysSinceDatasetStart, SecondsSinceDatasetUTCStart, SecondsSinceTimezonedDayStart,
@@ -333,28 +333,29 @@ impl TimetablesTrait for PeriodicTimetables {
         &mut self,
         date: & chrono::NaiveDate,
         vehicle_journey_idx: Idx<VehicleJourney>,
-    ) -> Result<(), VehicleJourneyRemovalError> {
+    ) -> Result<RemovalSuccess, RemovalError> {
         let has_timetables = self.vehicle_journey_to_timetables.get_mut(&vehicle_journey_idx);
         match has_timetables {
 
-            None => { // There is no vehicle with this vehicle_journey_index
-                Err(VehicleJourneyRemovalError::UnknownVehicleJourney)
+            None => { // There is no timetable with this vehicle_journey_index
+                Err(RemovalError::UnknownVehicleJourney)
             },
             Some(timetables) => {        
                 let day = self.calendar.date_to_days_since_start(date)
-                    .ok_or(VehicleJourneyRemovalError::UnknownDate)?;
-                let mut found = false;
+                    .ok_or(RemovalError::UnknownDate)?;
+                let mut found = 0usize;
                 for (days_pattern, timetable) in timetables.iter() {
                     if self.days_patterns.is_allowed(days_pattern, &day) {
-                        found = true;
-                        self.timetables.timetable_data(timetable).remove_vehicle(vehicle_idx)
+                        found = found + 1;
+                        self.timetables.timetable_data(timetable).remove_vehicles(|vehicle_data| {
+                            vehicle_data.vehicle_journey_idx == vehicle_journey_idx
+                        })
                     }
                 }
-                if found {
-                    Ok(())
-                }
-                else {
-                    Err(VehicleJourneyRemovalError::DateInvalidForVehicleJourney)
+                match found {
+                    0 => Err(RemovalError::DateInvalidForVehicleJourney),
+                    1 => Ok(RemovalSuccess::OneVehicleRemoved),
+                    _ => Ok(RemovalSuccess::MultipleVehicleRemoved)
                 }
             }
         }

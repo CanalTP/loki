@@ -150,7 +150,7 @@ pub trait Timetables: Types {
         &mut self,
         date: & chrono::NaiveDate,
         vehicle_journey_idx: Idx<VehicleJourney>,
-    ) -> Result<(),VehicleJourneyRemovalError>;
+    ) -> Result<RemovalSuccess, RemovalError>;
 
 }
 
@@ -166,8 +166,13 @@ pub trait TimetablesIter<'a>: Types {
 }
 
 
-pub enum VehicleJourneyRemovalError {
+pub enum RemovalError {
     UnknownDate,
     UnknownVehicleJourney,
     DateInvalidForVehicleJourney
+}
+
+pub enum RemovalSuccess {
+    MultipleVehicleRemoved,
+    OneVehicleRemoved,
 }

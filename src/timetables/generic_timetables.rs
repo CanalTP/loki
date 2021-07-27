@@ -34,10 +34,7 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
-use std::{
-    borrow::Borrow,
-    cmp::{max, min, Ordering},
-};
+use std::{borrow::Borrow, cmp::{max, min, Ordering}, ops::Not};
 use std::{collections::BTreeMap, fmt::Debug};
 use FlowDirection::{BoardAndDebark, BoardOnly, DebarkOnly, NoBoardDebark};
 use crate::timetables::{FlowDirection, Stop, StopFlows};
@@ -786,19 +783,60 @@ where
         Ok(())
     }
 
-    fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter, buffer : & mut Vec<bool>) -> Result<(), ()> 
+    fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter, buffer : & mut Vec<bool>) -> Result<usize, ()> 
         where Filter : Fn(&VehicleData) -> bool
     {
+
+        // nb of vehicle to remove ?
+        let nb_to_remove = self.vehicle_datas.iter().filter(|vehicle_data|  vehicle_filter(&vehicle_data)).count();
+        if nb_to_remove == 0 {
+            return Err(())
+        }
+
         // TODO : 
         //  Option 1 : use buffers to copy the data to keep, and then make swaps
         //             to obtain the data to keep : iterate on the zip(vec_to_modify, vehicle_data)
         //
         //   Option 2 : use retain with a closure whose state tracks the current index/vehicle
         //              see https://stackoverflow.com/a/59602788
-        Ok(())
+        for board_times  in self.board_times_by_position.iter_mut() {
+            let mut index = 0;
+            board_times.retain(|_| {
+                let to_retain = vehicle_filter(&self.vehicle_datas[index]).not();
+                index = index + 1;
+                to_retain
+            })
+        }
+        for debark_times  in self.debark_times_by_position.iter_mut() {
+            let mut index = 0;
+            debark_times.retain(|_| {
+                let to_retain = vehicle_filter(&self.vehicle_datas[index]).not();
+                index = index + 1;
+                to_retain
+            })
+        }
+
+        for vehicle_loads  in self.vehicle_loads.iter_mut() {
+            let mut index = 0;
+            vehicle_loads.retain(|_| {
+                let to_retain = vehicle_filter(&self.vehicle_datas[index]).not();
+                index = index + 1;
+                to_retain
+            })
+        }
+
+        {
+            self.vehicle_datas.retain(|vehicle_data| {
+                let to_retain = vehicle_filter(&vehicle_data).not();
+                to_retain
+            }) 
+        }
+
+        Ok(nb_to_remove)
 
     }
 }
+
 
 fn combine(a: Ordering, b: Ordering) -> Option<Ordering> {
     use Ordering::{Equal, Greater, Less};
