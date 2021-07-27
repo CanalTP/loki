@@ -116,6 +116,19 @@ impl DaysPatterns {
 
         DaysPattern { idx }
     }
+
+    pub fn common_days(&self, first_pattern : & DaysPattern, second_pattern : & DaysPattern, calendar : & Calendar) -> Vec<DaysSinceDatasetStart> {
+        let first_data = &self.days_patterns[first_pattern.idx].allowed_dates;
+        let second_data = &self.days_patterns[second_pattern.idx].allowed_dates;
+        let days = calendar.days();
+        let mut result = Vec::new();
+        for (day, (first, second)) in days.zip(first_data.iter().zip(second_data.iter())) {
+            if *first && *second { 
+                result.push(day);
+            }
+        }
+        result
+    }
 }
 
 pub struct DaysInPatternIter<'pattern> {

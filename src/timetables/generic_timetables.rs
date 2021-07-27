@@ -40,7 +40,6 @@ use std::{
 };
 use std::{collections::BTreeMap, fmt::Debug};
 use FlowDirection::{BoardAndDebark, BoardOnly, DebarkOnly, NoBoardDebark};
-
 use crate::timetables::{FlowDirection, Stop, StopFlows};
 
 #[derive(Debug)]
@@ -766,6 +765,38 @@ where
         let board_debark_cmp = combine(board_cmp, debark_cmp)?;
         let loads_cmp = partial_cmp(loads, self.vehicle_loads(vehicle_idx))?;
         combine(board_debark_cmp, loads_cmp)
+    }
+    fn remove_vehicle(&mut self, vehicle_idx : usize) -> Result<(), ()>
+    {
+        if vehicle_idx >= self.nb_of_vehicle() {
+            return Err(());
+        }
+
+        for board_times in self.board_times_by_position.iter_mut() {
+            board_times.remove(vehicle_idx);
+        }
+        for debark_times in self.debark_times_by_position.iter_mut() {
+            debark_times.remove(vehicle_idx);
+        }
+        
+        self.vehicle_loads.remove(vehicle_idx);
+        self.vehicle_datas.remove(vehicle_idx);
+
+
+        Ok(())
+    }
+
+    fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter, buffer : & mut Vec<bool>) -> Result<(), ()> 
+        where Filter : Fn(&VehicleData) -> bool
+    {
+        // TODO : 
+        //  Option 1 : use buffers to copy the data to keep, and then make swaps
+        //             to obtain the data to keep : iterate on the zip(vec_to_modify, vehicle_data)
+        //
+        //   Option 2 : use retain with a closure whose state tracks the current index/vehicle
+        //              see https://stackoverflow.com/a/59602788
+        Ok(())
+
     }
 }
 

@@ -34,15 +34,14 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
+use std::{collections::BTreeMap, ops::Not};
+
 use crate::{
     loads_data::{Load, LoadsData},
     time::days_patterns::{DaysInPatternIter, DaysPattern, DaysPatterns},
 };
 
-use super::{
-    generic_timetables::{Timetables, Vehicle},
-    TimetablesIter,
-};
+use super::{TimetablesIter, VehicleJourneyRemovalError, generic_timetables::{Timetables, Timetable, Vehicle}};
 
 use crate::time::{
     Calendar, DaysSinceDatasetStart, SecondsSinceDatasetUTCStart, SecondsSinceTimezonedDayStart,
@@ -61,6 +60,7 @@ pub struct PeriodicTimetables {
     timetables: Timetables<SecondsSinceTimezonedDayStart, (), TimeZone, VehicleData>,
     calendar: Calendar,
     days_patterns: DaysPatterns,
+    pub(super) vehicle_journey_to_timetables : BTreeMap<Idx<VehicleJourney>, Vec<(DaysPattern, Timetable)>>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +91,7 @@ impl TimetablesTrait for PeriodicTimetables {
             timetables: Timetables::new(),
             calendar,
             days_patterns: DaysPatterns::new(nb_of_days),
+            vehicle_journey_to_timetables : BTreeMap::new(),
         }
     }
 
@@ -303,12 +304,61 @@ impl TimetablesTrait for PeriodicTimetables {
         match insert_error {
             Ok(mission) => {
                 result.push(mission);
+
+                let vj_timetables = self.vehicle_journey_to_timetables.entry(vehicle_journey_idx).or_insert_with(||Vec::new());
+
+                for (other_pattern, _) in vj_timetables.iter() {
+                    let common_days = self.days_patterns.common_days(&days_pattern, &other_pattern, &self.calendar);
+                    if common_days.is_empty().not() {
+                        let common_dates : Vec<_>= common_days.iter().map(|day| {
+                                let date = self.calendar.to_naive_date(day);
+                                date.format("%H:%M:%S").to_string()
+                            }).collect();
+                        warn!("Vehicle_journey {} inserted at least twice for the dates {:#?}.", 
+                            vehicle_journey.id, 
+                            common_dates
+                        );
+                    }
+                }
+                vj_timetables.push((days_pattern, mission));
             }
             Err(error) => {
                 handle_vehicletimes_error(vehicle_journey, &error);
             }
         }
         result
+    }
+
+    fn remove<'date, Stops, Flows, Dates, Times>(
+        &mut self,
+        date: & chrono::NaiveDate,
+        vehicle_journey_idx: Idx<VehicleJourney>,
+    ) -> Result<(), VehicleJourneyRemovalError> {
+        let has_timetables = self.vehicle_journey_to_timetables.get_mut(&vehicle_journey_idx);
+        match has_timetables {
+
+            None => { // There is no vehicle with this vehicle_journey_index
+                Err(VehicleJourneyRemovalError::UnknownVehicleJourney)
+            },
+            Some(timetables) => {        
+                let day = self.calendar.date_to_days_since_start(date)
+                    .ok_or(VehicleJourneyRemovalError::UnknownDate)?;
+                let mut found = false;
+                for (days_pattern, timetable) in timetables.iter() {
+                    if self.days_patterns.is_allowed(days_pattern, &day) {
+                        found = true;
+                        self.timetables.timetable_data(timetable).remove_vehicle(vehicle_idx)
+                    }
+                }
+                if found {
+                    Ok(())
+                }
+                else {
+                    Err(VehicleJourneyRemovalError::DateInvalidForVehicleJourney)
+                }
+            }
+        }
+
     }
 }
 

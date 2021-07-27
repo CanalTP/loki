@@ -145,6 +145,13 @@ pub trait Timetables: Types {
         Flows: Iterator<Item = FlowDirection> + ExactSizeIterator + Clone,
         Dates: Iterator<Item = &'date chrono::NaiveDate>,
         Times: Iterator<Item = SecondsSinceTimezonedDayStart> + ExactSizeIterator + Clone;
+
+    fn remove<'date, Stops, Flows, Dates, Times>(
+        &mut self,
+        date: & chrono::NaiveDate,
+        vehicle_journey_idx: Idx<VehicleJourney>,
+    ) -> Result<(),VehicleJourneyRemovalError>;
+
 }
 
 pub trait TimetablesIter<'a>: Types {
@@ -156,4 +163,11 @@ pub trait TimetablesIter<'a>: Types {
 
     type Missions: Iterator<Item = Self::Mission>;
     fn missions(&'a self) -> Self::Missions;
+}
+
+
+pub enum VehicleJourneyRemovalError {
+    UnknownDate,
+    UnknownVehicleJourney,
+    DateInvalidForVehicleJourney
 }
