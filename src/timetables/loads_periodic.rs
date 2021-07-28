@@ -308,7 +308,7 @@ impl TimetablesTrait for PeriodicTimetables {
         for (loads, dates) in load_patterns_dates.into_iter() {
             let days_pattern = self
                 .days_patterns
-                .get_or_insert(dates.iter(), &self.calendar);
+                .get_from_dates(dates.iter(), &self.calendar);
             let vehicle_data = VehicleData {
                 days_pattern,
                 vehicle_journey_idx,

@@ -249,6 +249,15 @@ impl TimetablesTrait for DailyTimetables {
     fn nb_of_trips(&self) -> usize {
         self.timetables.nb_of_trips()
     }
+
+    fn remove<'date, Stops, Flows, Dates, Times>(
+        &mut self,
+        date: & chrono::NaiveDate,
+        vehicle_journey_idx: Idx<VehicleJourney>,
+    ) -> Result<super::RemovalSuccess, super::RemovalError> {
+        
+        
+    }
 }
 
 impl<'a> TimetablesIter<'a> for DailyTimetables {

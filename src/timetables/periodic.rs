@@ -280,7 +280,7 @@ impl TimetablesTrait for PeriodicTimetables {
     {
         let days_pattern = self
             .days_patterns
-            .get_or_insert(valid_dates, &self.calendar);
+            .get_from_dates(valid_dates, &self.calendar);
         let vehicle_data = VehicleData {
             days_pattern,
             vehicle_journey_idx,
