@@ -783,17 +783,15 @@ where
         Ok(())
     }
 
-    fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter, buffer : & mut Vec<bool>) -> Result<usize, ()> 
+    fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter) -> Result<usize, ()> 
         where Filter : Fn(&VehicleData) -> bool
     {
 
-        // nb of vehicle to remove ?
         let nb_to_remove = self.vehicle_datas.iter().filter(|vehicle_data|  vehicle_filter(&vehicle_data)).count();
         if nb_to_remove == 0 {
             return Err(())
         }
 
-        // TODO : 
         //  Option 1 : use buffers to copy the data to keep, and then make swaps
         //             to obtain the data to keep : iterate on the zip(vec_to_modify, vehicle_data)
         //
@@ -834,6 +832,30 @@ where
 
         Ok(nb_to_remove)
 
+    }
+
+    pub fn update_vehicles_data<Filter, Updater>(&mut self, 
+        vehicle_filter : Filter, 
+        updater : Updater, 
+    ) -> Result<usize, ()> 
+        where 
+            Filter : Fn(&VehicleData) -> bool,
+            Updater : FnMut(&mut VehicleData) -> ()
+    {
+        let mut nb_updated = 0usize;
+        for vehicle_data in self.vehicle_datas.iter_mut() {
+            if vehicle_filter(vehicle_data) {
+                updater(vehicle_data);
+                nb_updated = nb_updated + 1;
+            }
+
+        }
+        
+        match nb_updated {
+            0 => Err(()),
+            _ => Ok(nb_updated)
+        }
+        
     }
 }
 
