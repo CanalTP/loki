@@ -125,6 +125,13 @@ where
         &self.timetable_datas[timetable.idx]
     }
 
+    pub(super) fn timetable_data_mut(
+        &mut self,
+        timetable: &Timetable,
+    ) -> &mut TimetableData<Time, Load, TimezoneData, VehicleData> {
+        &mut self.timetable_datas[timetable.idx]
+    }
+
     pub(super) fn vehicle_data(&self, vehicle: &Vehicle) -> &VehicleData {
         self.timetable_data(&vehicle.timetable)
             .vehicle_data(vehicle.idx)
@@ -763,7 +770,7 @@ where
         let loads_cmp = partial_cmp(loads, self.vehicle_loads(vehicle_idx))?;
         combine(board_debark_cmp, loads_cmp)
     }
-    fn remove_vehicle(&mut self, vehicle_idx : usize) -> Result<(), ()>
+    pub(super) fn remove_vehicle(&mut self, vehicle_idx : usize) -> Result<(), ()>
     {
         if vehicle_idx >= self.nb_of_vehicle() {
             return Err(());
@@ -783,7 +790,7 @@ where
         Ok(())
     }
 
-    fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter) -> Result<usize, ()> 
+    pub(super) fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter) -> Result<usize, ()> 
         where Filter : Fn(&VehicleData) -> bool
     {
 

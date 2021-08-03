@@ -158,31 +158,30 @@ impl DayToTimetable {
         day_to_remove : & DaysSinceDatasetStart,
         days_patterns : & mut DaysPatterns, 
         calendar : & Calendar
-    ) ->Result<(), RemoveError>
+    ) ->Result<Timetable, RemoveError>
     {
         // let's try to find the first element where day_to_remove is set.
         // Because of invariant 1., if such an element is found, we know that
         // day_to_remove is not set in any other element
         let has_days_pattern = self.pattern_timetables.iter_mut()
-            .map(|(days_pattern, _)| days_pattern)
             .enumerate()
-            .find(|(idx, days_pattern)| {
+            .find(|(idx, (days_pattern, timetable))| {
                     days_patterns.is_allowed(days_pattern, day_to_remove)
                 });
 
 
-        if let Some((idx, old_days_pattern)) = has_days_pattern{
+        if let Some((idx, (old_days_pattern, timetable))) = has_days_pattern{
 
             let new_days_pattern = days_patterns.get_pattern_without_day(*old_days_pattern, day_to_remove, calendar)
                 .map_err(|()| RemoveError::DayNotSet)?;
 
             if days_patterns.is_empty_pattern(&new_days_pattern) {
                 self.pattern_timetables.swap_remove(idx);
-                Ok(())
+                Ok(timetable.clone())
             }
             else {
                 *old_days_pattern = new_days_pattern;
-                Ok(())
+                Ok(timetable.clone())
             }
 
         }

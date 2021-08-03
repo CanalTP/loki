@@ -341,7 +341,7 @@ impl TimetablesTrait for PeriodicTimetables {
         let day = self.calendar.date_to_days_since_start(date).ok_or(RemovalError::UnknownDate)?;
 
         let has_timetables = self.vehicle_journey_to_timetables.get_mut(&vehicle_journey_idx);
-        match has_timetables {
+        let result = match has_timetables {
 
             None => { // There is no timetable with this vehicle_journey_index
                 Err(RemovalError::UnknownVehicleJourney)
@@ -353,7 +353,39 @@ impl TimetablesTrait for PeriodicTimetables {
 
                 
             }
+        };
+
+        match result {
+            Err(err) => Err(err), 
+            Ok(timetable) => {
+                // we remove day from the day_pattern of the vehicle
+                let timetable_data = self.timetables.timetable_data_mut(&timetable);
+                timetable_data
+                    .update_vehicles_data(|vehicle_data| {
+                        vehicle_data.vehicle_journey_idx == vehicle_journey_idx
+                         && self.days_patterns.is_allowed(&vehicle_data.days_pattern, &day)
+                    },
+                    |vehicle_data| {
+                        vehicle_data.days_pattern = 
+                            self.days_patterns
+                            .get_pattern_without_day(vehicle_data.days_pattern, &day, &self.calendar)
+                            .unwrap();  // unwrap is safe, because this updater closure will be applied only on 
+                                        // a vehicle_data on which the filter closure above returns true
+                                        // hence vehicle_data.days_patten has day set
+                                        // and thus the pattern without day exists
+                    }); 
+
+                // by removing a day from the day_pattern, the day_pattern may have become empty
+                // in this case, we remove all vehicle with an empty day_pattern
+                timetable_data.remove_vehicles(|vehicle_data| {
+                    self.days_patterns.is_empty_pattern(&vehicle_data.days_pattern)
+                });
+
+                Ok(())
+            }
         }
+
+
 
     }
 }
