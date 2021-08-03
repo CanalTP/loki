@@ -40,6 +40,7 @@ mod iters;
 mod loads_daily;
 mod loads_periodic;
 mod periodic;
+mod day_to_timetable;
 
 pub use daily::DailyTimetables;
 pub use periodic::PeriodicTimetables;
