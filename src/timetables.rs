@@ -147,11 +147,11 @@ pub trait Timetables: Types {
         Dates: Iterator<Item = &'date chrono::NaiveDate>,
         Times: Iterator<Item = SecondsSinceTimezonedDayStart> + ExactSizeIterator + Clone;
 
-    fn remove<'date, Stops, Flows, Dates, Times>(
+    fn remove(
         &mut self,
         date: & chrono::NaiveDate,
         vehicle_journey_idx: Idx<VehicleJourney>,
-    ) -> Result<RemovalSuccess, RemovalError>;
+    ) -> Result<(), RemovalError>;
 
 }
 
@@ -171,9 +171,4 @@ pub enum RemovalError {
     UnknownDate,
     UnknownVehicleJourney,
     DateInvalidForVehicleJourney
-}
-
-pub enum RemovalSuccess {
-    MultipleVehicleRemoved,
-    OneVehicleRemoved,
 }

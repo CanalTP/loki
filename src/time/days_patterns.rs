@@ -226,7 +226,12 @@ impl DaysPatterns {
 
     }
 
-    pub fn common_days(&self, first_pattern : & DaysPattern, second_pattern : & DaysPattern, calendar : & Calendar) -> Vec<DaysSinceDatasetStart> {
+    pub fn common_days(&self, 
+        first_pattern : & DaysPattern, 
+        second_pattern : & DaysPattern, 
+        calendar : & Calendar
+    ) -> Vec<DaysSinceDatasetStart> {
+
         let first_data = &self.days_patterns[first_pattern.idx].allowed_dates;
         let second_data = &self.days_patterns[second_pattern.idx].allowed_dates;
         let days = calendar.days();
@@ -237,6 +242,26 @@ impl DaysPatterns {
             }
         }
         result
+    }
+
+    pub fn have_common_day(&self, 
+        first_pattern : & DaysPattern, 
+        second_pattern : & DaysPattern, 
+    ) -> Option<DaysSinceDatasetStart> 
+    {
+
+        let first_data = &self.days_patterns[first_pattern.idx].allowed_dates;
+        let second_data = &self.days_patterns[second_pattern.idx].allowed_dates;
+        first_data.iter().zip(second_data.iter())
+            .map(|(first, second)| {
+                * first && * second
+            })
+            .enumerate()
+            .find(|(_, is_common_day)| *is_common_day)
+            .map(|(day_idx, _)| DaysSinceDatasetStart {
+                days : day_idx as u16
+            })
+
     }
 }
 

@@ -59,7 +59,18 @@ impl DayToTimetable {
         }
     }
 
-    pub fn insert(& mut self, 
+    pub fn contains_day(&self, day : & DaysSinceDatasetStart, days_patterns : & DaysPatterns) -> bool {
+        self.pattern_timetables.iter()
+            .any(|(days_pattern, _)|{  days_patterns.is_allowed(days_pattern, day) })
+    }
+
+    pub fn has_intersection_with(&self, days_pattern_to_intersect : & DaysPattern, days_patterns : & DaysPatterns) -> Option<DaysSinceDatasetStart> {
+        self.pattern_timetables.iter()
+            .find_map(|(days_pattern, _)|{  days_patterns.have_common_day(days_pattern, days_pattern_to_intersect) })
+    }
+
+
+    pub fn insert_one_day(& mut self, 
         day_to_insert : & DaysSinceDatasetStart, 
         timetable_to_insert : & Timetable, 
         days_patterns : & mut DaysPatterns, 
@@ -100,6 +111,48 @@ impl DayToTimetable {
         
         Ok(())
     }
+
+    pub fn insert_days_pattern(& mut self, 
+        days_pattern_to_insert : & DaysPattern, 
+        timetable_to_insert : & Timetable, 
+        days_patterns : & mut DaysPatterns, 
+        calendar : & Calendar
+    ) ->  Result<(), InsertError>
+    {
+
+        // is there a day in days_pattern_to_insert that is already set somewhere ?
+        for (days_pattern, _) in self.pattern_timetables.iter() {
+            if let Some(day) = days_patterns.have_common_day(days_pattern, days_pattern_to_insert) {
+                return Err(InsertError::DayAlreadySet);
+            }
+        }
+
+        // We try to find the first element whose timetable contains timetable_to_insert .
+        // Because of our invariant 2., if such an element is found we know that 
+        // timetable_to_insert does not appears in any other element of the vec.
+        let has_days_pattern = self.pattern_timetables.iter_mut().
+            find(|(days_pattern, timetable)| {
+                    timetable == timetable_to_insert
+                })
+            .map(|(days_pattern, _)| days_pattern); // we are just interested in the pattern
+
+        if let Some(old_days_pattern) = has_days_pattern {
+            // so now timetable_to_insert is valid on old_days_pattern and days_pattern_to_insert
+            // let's create a new days_pattern for that
+            let new_days_pattern = days_patterns
+            .get_union(*old_days_pattern, *days_pattern_to_insert, calendar);
+
+            * old_days_pattern = new_days_pattern;
+        }
+        else {  // if timetable_to_insert does not appears in the Vec, 
+                // let's push a new element to the Vec with it
+            self.pattern_timetables.push((*days_pattern_to_insert, *timetable_to_insert));
+        }
+        
+        Ok(())
+    }
+
+    
 
     pub fn remove(& mut self,
         day_to_remove : & DaysSinceDatasetStart,
@@ -150,11 +203,11 @@ impl DayToTimetable {
 // fn get_timetable(day) -> Option<Timetable>
 // fn add_timetable(day, timetable)  // update the struct, insert
 // fn remove(day)
-
+#[derive(Debug)]
 enum InsertError {
     DayAlreadySet,
 }
-
+#[derive(Debug)]
 enum RemoveError {
     DayNotSet,
 }
