@@ -97,7 +97,7 @@ impl DaysPatterns {
         self.get_or_insert_from_buffer()
     }
 
-    pub fn get_for_day(&mut self, day: & DaysSinceDatasetStart, calendar: &Calendar) -> DaysPattern
+    pub fn get_for_day(&mut self, day: & DaysSinceDatasetStart) -> DaysPattern
     {
         // set all elements of the buffer to false
         self.buffer.fill(false);
@@ -141,7 +141,6 @@ impl DaysPatterns {
     pub fn get_pattern_without_day(&mut self, 
         original_pattern: DaysPattern, 
         day_to_remove: &DaysSinceDatasetStart,
-        calendar : &Calendar,
     ) -> Result<DaysPattern, ()>
     {
         if self.is_allowed(&original_pattern, day_to_remove).not() {
@@ -164,7 +163,6 @@ impl DaysPatterns {
     pub fn get_pattern_with_additional_day(&mut self, 
         original_pattern: DaysPattern, 
         day_to_add: &DaysSinceDatasetStart,
-        calendar : &Calendar,
     ) -> Result<DaysPattern, ()>
     {
         if self.is_allowed(&original_pattern, day_to_add) {
@@ -187,7 +185,6 @@ impl DaysPatterns {
     pub fn get_intersection(&mut self, 
         first_pattern: DaysPattern, 
         second_pattern: DaysPattern, 
-        calendar : &Calendar,
     ) -> DaysPattern 
     {
         let first_dates = & self.days_patterns[first_pattern.idx].allowed_dates;
@@ -208,7 +205,6 @@ impl DaysPatterns {
     pub fn get_union(&mut self, 
         first_pattern: DaysPattern, 
         second_pattern: DaysPattern, 
-        calendar : &Calendar,
     ) -> DaysPattern 
     {
         let first_dates = & self.days_patterns[first_pattern.idx].allowed_dates;

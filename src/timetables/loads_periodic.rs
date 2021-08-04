@@ -305,7 +305,7 @@ impl TimetablesTrait for PeriodicTimetables {
 
         let vj_timetables = self.vehicle_journey_to_timetables
             .entry(vehicle_journey_idx)
-            .or_insert(DayToTimetable::new(&self.calendar));
+            .or_insert(DayToTimetable::new());
 
         for (loads, dates) in load_patterns_dates.into_iter() {
             let days_pattern = self
@@ -340,7 +340,7 @@ impl TimetablesTrait for PeriodicTimetables {
                         result.push(mission.clone());
                     }
     
-                    vj_timetables.insert_days_pattern(&days_pattern, &mission, & mut self.days_patterns, &self.calendar)
+                    vj_timetables.insert_days_pattern(&days_pattern, &mission, & mut self.days_patterns)
                         .unwrap(); // unwrap should be safe here, because we check above that vj_timetables has no intersection with days_pattern
     
                 }
@@ -368,7 +368,7 @@ impl TimetablesTrait for PeriodicTimetables {
             },
             Some(day_to_timetable) => {        
                 day_to_timetable
-                    .remove(&day, &mut self.days_patterns, & self.calendar)
+                    .remove(&day, &mut self.days_patterns)
                     .map_err(|_| RemovalError::DateInvalidForVehicleJourney)
 
                 
@@ -381,15 +381,14 @@ impl TimetablesTrait for PeriodicTimetables {
                 // we remove day from the day_pattern of the vehicle
                 let timetable_data = self.timetables.timetable_data_mut(&timetable);
                 let days_patterns = & mut self.days_patterns;
-                let calendar = & self.calendar;
-                timetable_data
+                let update_result = timetable_data
                     .update_vehicles_data(
                     |vehicle_data| {
                         if vehicle_data.vehicle_journey_idx == vehicle_journey_idx
                         && days_patterns.is_allowed(&vehicle_data.days_pattern, &day) {
                             vehicle_data.days_pattern = 
                             days_patterns
-                            .get_pattern_without_day(vehicle_data.days_pattern, &day, calendar)
+                            .get_pattern_without_day(vehicle_data.days_pattern, &day)
                             .unwrap();  // unwrap is safe, because we check above that 
                                         // vehicle_data.days_pattern contains day
                             true
@@ -397,14 +396,17 @@ impl TimetablesTrait for PeriodicTimetables {
                         else { 
                             false
                         }
-
                     }); 
+
+                assert!(update_result == Ok(1), "Updated more than one vehicle for one (vehicle_journey_idx, day).");
 
                 // by removing a day from the day_pattern, the day_pattern may have become empty
                 // in this case, we remove all vehicle with an empty day_pattern
-                timetable_data.remove_vehicles(|vehicle_data| {
+                let remove_result = timetable_data.remove_vehicles(|vehicle_data| {
                         days_patterns.is_empty_pattern(&vehicle_data.days_pattern)
                     });
+
+                assert!(remove_result == Ok(1), "Removed more than one vehicle for one (vehicle_journey_idx, day).");
 
                 Ok(())
             }

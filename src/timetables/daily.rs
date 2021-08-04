@@ -208,7 +208,7 @@ impl TimetablesTrait for DailyTimetables {
         };
         let vj_timetables = self.vehicle_journey_to_timetables
             .entry(vehicle_journey_idx)
-            .or_insert(DayToTimetable::new(&self.calendar));
+            .or_insert(DayToTimetable::new());
 
         for date in valid_dates {
             let has_day = self.calendar.date_to_days_since_start(date);
@@ -260,8 +260,8 @@ impl TimetablesTrait for DailyTimetables {
                             if ! result.contains(&mission) {
                                 result.push(mission.clone());
                             }
-                            let days_pattern = self.days_patterns.get_for_day(&day, &self.calendar);
-                            vj_timetables.insert_days_pattern(&days_pattern, &mission, & mut self.days_patterns, &self.calendar)
+                            let days_pattern = self.days_patterns.get_for_day(&day);
+                            vj_timetables.insert_days_pattern(&days_pattern, &mission, & mut self.days_patterns)
                                 .unwrap(); // unwrap should be safe here, because we check above that vj_timetables has no intersection with days_pattern
 
                         }
@@ -294,7 +294,7 @@ impl TimetablesTrait for DailyTimetables {
             },
             Some(day_to_timetable) => {        
                 day_to_timetable
-                    .remove(&day, &mut self.days_patterns, &self.calendar)
+                    .remove(&day, &mut self.days_patterns)
                     .map_err(|_| RemovalError::DateInvalidForVehicleJourney)
 
                 

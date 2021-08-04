@@ -35,7 +35,7 @@
 // www.navitia.io
 
 
-use crate::{time::{Calendar, DaysSinceDatasetStart, days_patterns::{DaysPattern, DaysPatterns}}};
+use crate::{time::{DaysSinceDatasetStart, days_patterns::{DaysPattern, DaysPatterns}}};
 
 use super::{ generic_timetables::{Timetable}};
 
@@ -53,7 +53,7 @@ pub struct DayToTimetable {
 
 
 impl DayToTimetable {
-    pub fn new(calendar : & Calendar) -> Self {
+    pub fn new() -> Self {
         Self {
             pattern_timetables : Vec::new()
         }
@@ -74,7 +74,6 @@ impl DayToTimetable {
         day_to_insert : & DaysSinceDatasetStart, 
         timetable_to_insert : & Timetable, 
         days_patterns : & mut DaysPatterns, 
-        calendar : & Calendar
     ) -> Result<(), InsertError>
     {
         // let's check if this day is already set
@@ -88,7 +87,7 @@ impl DayToTimetable {
         // Because of our invariant 2., if such an element is found we know that 
         // timetable_to_insert does not appears in any other element of the vec.
         let has_days_pattern = self.pattern_timetables.iter_mut().
-            find(|(days_pattern, timetable)| {
+            find(|(_days_pattern, timetable)| {
                     timetable == timetable_to_insert
                 })
             .map(|(days_pattern, _)| days_pattern); // we are just interested in the pattern
@@ -97,7 +96,7 @@ impl DayToTimetable {
             // so now timetable_to_insert is valid on old_days_pattern and day_to_insert
             // let's create a new days_pattern for that
             let new_days_pattern = days_patterns
-            .get_pattern_with_additional_day(*old_days_pattern, day_to_insert, calendar)
+            .get_pattern_with_additional_day(*old_days_pattern, day_to_insert)
             .map_err(|()| InsertError::DayAlreadySet)?;
 
             * old_days_pattern = new_days_pattern;
@@ -105,7 +104,7 @@ impl DayToTimetable {
         else {  // if timetable_to_insert does not appears in the Vec, 
                 // let's push a new element to the Vec with it
 
-            let days_pattern = days_patterns.get_for_day(day_to_insert, calendar);
+            let days_pattern = days_patterns.get_for_day(day_to_insert);
             self.pattern_timetables.push((days_pattern, timetable_to_insert.clone()));
         }
         
@@ -115,14 +114,13 @@ impl DayToTimetable {
     pub fn insert_days_pattern(& mut self, 
         days_pattern_to_insert : & DaysPattern, 
         timetable_to_insert : & Timetable, 
-        days_patterns : & mut DaysPatterns, 
-        calendar : & Calendar
+        days_patterns : & mut DaysPatterns,
     ) ->  Result<(), InsertError>
     {
 
         // is there a day in days_pattern_to_insert that is already set somewhere ?
         for (days_pattern, _) in self.pattern_timetables.iter() {
-            if let Some(day) = days_patterns.have_common_day(days_pattern, days_pattern_to_insert) {
+            if let Some(_day) = days_patterns.have_common_day(days_pattern, days_pattern_to_insert) {
                 return Err(InsertError::DayAlreadySet);
             }
         }
@@ -131,7 +129,7 @@ impl DayToTimetable {
         // Because of our invariant 2., if such an element is found we know that 
         // timetable_to_insert does not appears in any other element of the vec.
         let has_days_pattern = self.pattern_timetables.iter_mut().
-            find(|(days_pattern, timetable)| {
+            find(|(_days_pattern, timetable)| {
                     timetable == timetable_to_insert
                 })
             .map(|(days_pattern, _)| days_pattern); // we are just interested in the pattern
@@ -140,7 +138,7 @@ impl DayToTimetable {
             // so now timetable_to_insert is valid on old_days_pattern and days_pattern_to_insert
             // let's create a new days_pattern for that
             let new_days_pattern = days_patterns
-            .get_union(*old_days_pattern, *days_pattern_to_insert, calendar);
+            .get_union(*old_days_pattern, *days_pattern_to_insert);
 
             * old_days_pattern = new_days_pattern;
         }
@@ -157,7 +155,6 @@ impl DayToTimetable {
     pub fn remove(& mut self,
         day_to_remove : & DaysSinceDatasetStart,
         days_patterns : & mut DaysPatterns, 
-        calendar : & Calendar
     ) ->Result<Timetable, RemoveError>
     {
         // let's try to find the first element where day_to_remove is set.
@@ -165,7 +162,7 @@ impl DayToTimetable {
         // day_to_remove is not set in any other element
         let has_days_pattern = self.pattern_timetables.iter_mut()
             .enumerate()
-            .find(|(idx, (days_pattern, timetable))| {
+            .find(|(_idx, (days_pattern, _timetable))| {
                     days_patterns.is_allowed(days_pattern, day_to_remove)
                 });
 
@@ -176,7 +173,7 @@ impl DayToTimetable {
             },
             Some((idx, (old_days_pattern, timetable))) => {
 
-                let new_days_pattern = days_patterns.get_pattern_without_day(*old_days_pattern, day_to_remove, calendar)
+                let new_days_pattern = days_patterns.get_pattern_without_day(*old_days_pattern, day_to_remove)
                     .map_err(|()| RemoveError::DayNotSet)?; 
     
                 if days_patterns.is_empty_pattern(&new_days_pattern) {
@@ -199,16 +196,13 @@ impl DayToTimetable {
 
     fn get_timetable_for(&self, day : & DaysSinceDatasetStart, days_patterns : & DaysPatterns) -> Option<Timetable> {
         self.pattern_timetables.iter()
-            .find(|(days_pattern, timetable)| {
+            .find(|(days_pattern, _timetable)| {
                     days_patterns.is_allowed(days_pattern, day)
                 })
-            .map(|(days_pattern, timetable)| timetable.clone())
+            .map(|(_days_pattern, timetable)| timetable.clone())
     }
 }
 
-// fn get_timetable(day) -> Option<Timetable>
-// fn add_timetable(day, timetable)  // update the struct, insert
-// fn remove(day)
 #[derive(Debug)]
 pub enum InsertError {
     DayAlreadySet,
