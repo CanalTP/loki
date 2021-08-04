@@ -806,53 +806,54 @@ where
         //              see https://stackoverflow.com/a/59602788
         for board_times  in self.board_times_by_position.iter_mut() {
             let mut index = 0;
+            let vehicle_datas = &self.vehicle_datas;
             board_times.retain(|_| {
-                let to_retain = vehicle_filter(&self.vehicle_datas[index]).not();
+                let to_retain = vehicle_filter(&vehicle_datas[index]).not();
                 index = index + 1;
                 to_retain
-            })
+            });
         }
         for debark_times  in self.debark_times_by_position.iter_mut() {
             let mut index = 0;
+            let vehicle_datas = &self.vehicle_datas;
             debark_times.retain(|_| {
-                let to_retain = vehicle_filter(&self.vehicle_datas[index]).not();
+                let to_retain = vehicle_filter(&vehicle_datas[index]).not();
                 index = index + 1;
                 to_retain
-            })
+            });
         }
 
         for vehicle_loads  in self.vehicle_loads.iter_mut() {
             let mut index = 0;
+            let vehicle_datas = &self.vehicle_datas;
             vehicle_loads.retain(|_| {
-                let to_retain = vehicle_filter(&self.vehicle_datas[index]).not();
+                let to_retain = vehicle_filter(&vehicle_datas[index]).not();
                 index = index + 1;
                 to_retain
-            })
+            });
         }
 
         {
             self.vehicle_datas.retain(|vehicle_data| {
                 let to_retain = vehicle_filter(&vehicle_data).not();
                 to_retain
-            }) 
+            });
         }
 
         Ok(nb_to_remove)
 
     }
 
-    pub fn update_vehicles_data<Filter, Updater>(&mut self, 
-        vehicle_filter : Filter, 
-        updater : Updater, 
+    pub fn update_vehicles_data<Updater>(&mut self, 
+        mut updater : Updater, 
     ) -> Result<usize, ()> 
         where 
-            Filter : Fn(&VehicleData) -> bool,
-            Updater : FnMut(&mut VehicleData) -> ()
+            Updater : FnMut(&mut VehicleData) -> bool // returns true when an update took place
     {
         let mut nb_updated = 0usize;
         for vehicle_data in self.vehicle_datas.iter_mut() {
-            if vehicle_filter(vehicle_data) {
-                updater(vehicle_data);
+            let updated = updater(vehicle_data);
+            if updated {
                 nb_updated = nb_updated + 1;
             }
 

@@ -106,7 +106,7 @@ impl DayToTimetable {
                 // let's push a new element to the Vec with it
 
             let days_pattern = days_patterns.get_for_day(day_to_insert, calendar);
-            self.pattern_timetables.push((days_pattern, *timetable_to_insert));
+            self.pattern_timetables.push((days_pattern, timetable_to_insert.clone()));
         }
         
         Ok(())
@@ -146,7 +146,7 @@ impl DayToTimetable {
         }
         else {  // if timetable_to_insert does not appears in the Vec, 
                 // let's push a new element to the Vec with it
-            self.pattern_timetables.push((*days_pattern_to_insert, *timetable_to_insert));
+            self.pattern_timetables.push((*days_pattern_to_insert, timetable_to_insert.clone()));
         }
         
         Ok(())
@@ -170,24 +170,31 @@ impl DayToTimetable {
                 });
 
 
-        if let Some((idx, (old_days_pattern, timetable))) = has_days_pattern{
+        let (removed_timetable, has_idx_to_remove) = match has_days_pattern {
+            None => {
+                return Err(RemoveError::DayNotSet);
+            },
+            Some((idx, (old_days_pattern, timetable))) => {
 
-            let new_days_pattern = days_patterns.get_pattern_without_day(*old_days_pattern, day_to_remove, calendar)
-                .map_err(|()| RemoveError::DayNotSet)?;
-
-            if days_patterns.is_empty_pattern(&new_days_pattern) {
-                self.pattern_timetables.swap_remove(idx);
-                Ok(timetable.clone())
+                let new_days_pattern = days_patterns.get_pattern_without_day(*old_days_pattern, day_to_remove, calendar)
+                    .map_err(|()| RemoveError::DayNotSet)?; 
+    
+                if days_patterns.is_empty_pattern(&new_days_pattern) {
+                    (timetable.clone(), Some(idx) )
+                }
+                else {
+                    *old_days_pattern = new_days_pattern;
+                    (timetable.clone(), None )
+                }
+    
             }
-            else {
-                *old_days_pattern = new_days_pattern;
-                Ok(timetable.clone())
-            }
+        };
 
+        if let Some(idx) = has_idx_to_remove {
+            self.pattern_timetables.swap_remove(idx);
         }
-        else {
-            Err(RemoveError::DayNotSet)
-        }
+
+        Ok(removed_timetable)
     }
 
     fn get_timetable_for(&self, day : & DaysSinceDatasetStart, days_patterns : & DaysPatterns) -> Option<Timetable> {
@@ -203,10 +210,10 @@ impl DayToTimetable {
 // fn add_timetable(day, timetable)  // update the struct, insert
 // fn remove(day)
 #[derive(Debug)]
-enum InsertError {
+pub enum InsertError {
     DayAlreadySet,
 }
 #[derive(Debug)]
-enum RemoveError {
+pub enum RemoveError {
     DayNotSet,
 }

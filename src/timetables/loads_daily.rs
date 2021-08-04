@@ -34,13 +34,11 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
-use super::{
-    generic_timetables::{Position, Timetable, Timetables, Vehicle, VehicleTimesError},
-    iters::{PositionsIter, TimetableIter, VehicleIter},
-    FlowDirection, Stop, TimetablesIter,
-};
+use std::collections::BTreeMap;
 
-use crate::transit_data::{Idx, VehicleJourney};
+use super::{FlowDirection, Stop, TimetablesIter, day_to_timetable::DayToTimetable, generic_timetables::{Position, Timetable, Timetables, Vehicle, VehicleTimesError}, iters::{PositionsIter, TimetableIter, VehicleIter}};
+
+use crate::{time::days_patterns::DaysPatterns, transit_data::{Idx, VehicleJourney}};
 use crate::{
     loads_data::LoadsData,
     time::{
@@ -60,6 +58,9 @@ pub type Time = SecondsSinceDatasetUTCStart;
 pub struct DailyTimetables {
     timetables: Timetables<Time, Load, (), VehicleData>,
     calendar: Calendar,
+    days_patterns: DaysPatterns,
+    vehicle_journey_to_timetables : BTreeMap<Idx<VehicleJourney>, DayToTimetable>,
+
 }
 #[derive(Clone, Debug)]
 struct VehicleData {
@@ -77,9 +78,13 @@ impl TimetablesTypes for DailyTimetables {
 
 impl TimetablesTrait for DailyTimetables {
     fn new(first_date: NaiveDate, last_date: NaiveDate) -> Self {
+        let calendar = Calendar::new(first_date, last_date);
+        let nb_of_days: usize = calendar.nb_of_days().into();
         Self {
             timetables: Timetables::new(),
-            calendar: Calendar::new(first_date, last_date),
+            calendar: calendar,
+            days_patterns: DaysPatterns::new(nb_of_days),
+            vehicle_journey_to_timetables : BTreeMap::new(),
         }
     }
 
@@ -191,6 +196,10 @@ impl TimetablesTrait for DailyTimetables {
             vec![Load::default(); 0]
         };
 
+        let vj_timetables = self.vehicle_journey_to_timetables
+            .entry(vehicle_journey_idx)
+            .or_insert(DayToTimetable::new(&self.calendar));
+
         for date in valid_dates {
             let has_day = self.calendar.date_to_days_since_start(date);
             match has_day {
@@ -207,6 +216,15 @@ impl TimetablesTrait for DailyTimetables {
                     continue;
                 }
                 Some(day) => {
+
+                    if vj_timetables.contains_day(&day, &self.days_patterns)  {
+                        warn!("Trying to add vehicle journey {} multiple time for day {}. Insertion skipped.",
+                            vehicle_journey.id,
+                            self.calendar.to_naive_date(&day)
+                        );
+                        continue;
+                    }
+
                     let calendar = &self.calendar;
                     let board_times_utc = board_times
                         .clone()
@@ -222,7 +240,7 @@ impl TimetablesTrait for DailyTimetables {
                         vehicle_journey_idx,
                         day,
                     };
-                    let insert_error = self.timetables.insert(
+                    let insert_result = self.timetables.insert(
                         stops.clone(),
                         flows.clone(),
                         board_times_utc,
@@ -231,9 +249,15 @@ impl TimetablesTrait for DailyTimetables {
                         (),
                         vehicle_data,
                     );
-                    match insert_error {
+                    match insert_result {
                         Ok(mission) => {
-                            result.push(mission);
+                            if ! result.contains(&mission) {
+                                result.push(mission.clone());
+                            }
+                            let days_pattern = self.days_patterns.get_for_day(&day, &self.calendar);
+                            vj_timetables.insert_days_pattern(&days_pattern, &mission, & mut self.days_patterns, &self.calendar)
+                                .unwrap(); // unwrap should be safe here, because we check above that vj_timetables has no intersection with days_pattern
+
                         }
                         Err(error) => {
                             handle_vehicletimes_error(vehicle_journey, date, &error);
@@ -243,6 +267,14 @@ impl TimetablesTrait for DailyTimetables {
             }
         }
         result
+    }
+
+    fn remove(
+        &mut self,
+        date: & chrono::NaiveDate,
+        vehicle_journey_idx: Idx<VehicleJourney>,
+    ) -> Result<(), super::RemovalError> {
+        todo!()
     }
 }
 
