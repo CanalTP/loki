@@ -97,8 +97,7 @@ impl DaysPatterns {
         self.get_or_insert_from_buffer()
     }
 
-    pub fn get_for_day(&mut self, day: & DaysSinceDatasetStart) -> DaysPattern
-    {
+    pub fn get_for_day(&mut self, day: &DaysSinceDatasetStart) -> DaysPattern {
         // set all elements of the buffer to false
         self.buffer.fill(false);
 
@@ -107,15 +106,13 @@ impl DaysPatterns {
         self.get_or_insert_from_buffer()
     }
 
-    pub fn is_empty_pattern(&self, days_pattern : & DaysPattern) -> bool {
+    pub fn is_empty_pattern(&self, days_pattern: &DaysPattern) -> bool {
         let allowed_dates = &self.days_patterns[days_pattern.idx].allowed_dates;
-        let has_a_day_set = allowed_dates.iter().any( |day_allowed| *day_allowed);
+        let has_a_day_set = allowed_dates.iter().any(|day_allowed| *day_allowed);
         has_a_day_set.not()
     }
 
-
     fn get_or_insert_from_buffer(&mut self) -> DaysPattern {
-
         let has_days_pattern = self
             .days_patterns
             .iter()
@@ -135,18 +132,17 @@ impl DaysPatterns {
         };
 
         DaysPattern { idx }
-
     }
 
-    pub fn get_pattern_without_day(&mut self, 
-        original_pattern: DaysPattern, 
+    pub fn get_pattern_without_day(
+        &mut self,
+        original_pattern: DaysPattern,
         day_to_remove: &DaysSinceDatasetStart,
-    ) -> Result<DaysPattern, ()>
-    {
+    ) -> Result<DaysPattern, ()> {
         if self.is_allowed(&original_pattern, day_to_remove).not() {
             return Err(());
         }
-        let original_allowed_dates = & self.days_patterns[original_pattern.idx].allowed_dates;
+        let original_allowed_dates = &self.days_patterns[original_pattern.idx].allowed_dates;
 
         // let's put the actual pattern of allowed days into self.buffer
         debug_assert!(original_allowed_dates.len() == self.buffer.len());
@@ -155,20 +151,18 @@ impl DaysPatterns {
 
         let result = self.get_or_insert_from_buffer();
 
-
         Ok(result)
-
     }
 
-    pub fn get_pattern_with_additional_day(&mut self, 
-        original_pattern: DaysPattern, 
+    pub fn get_pattern_with_additional_day(
+        &mut self,
+        original_pattern: DaysPattern,
         day_to_add: &DaysSinceDatasetStart,
-    ) -> Result<DaysPattern, ()>
-    {
+    ) -> Result<DaysPattern, ()> {
         if self.is_allowed(&original_pattern, day_to_add) {
             return Err(());
         }
-        let original_allowed_dates = & self.days_patterns[original_pattern.idx].allowed_dates;
+        let original_allowed_dates = &self.days_patterns[original_pattern.idx].allowed_dates;
 
         // let's put the actual pattern of allowed days into self.buffer
         debug_assert!(original_allowed_dates.len() == self.buffer.len());
@@ -177,18 +171,16 @@ impl DaysPatterns {
 
         let result = self.get_or_insert_from_buffer();
 
-
         Ok(result)
-
     }
 
-    pub fn get_intersection(&mut self, 
-        first_pattern: DaysPattern, 
-        second_pattern: DaysPattern, 
-    ) -> DaysPattern 
-    {
-        let first_dates = & self.days_patterns[first_pattern.idx].allowed_dates;
-        let second_dates = & self.days_patterns[second_pattern.idx].allowed_dates;
+    pub fn get_intersection(
+        &mut self,
+        first_pattern: DaysPattern,
+        second_pattern: DaysPattern,
+    ) -> DaysPattern {
+        let first_dates = &self.days_patterns[first_pattern.idx].allowed_dates;
+        let second_dates = &self.days_patterns[second_pattern.idx].allowed_dates;
 
         debug_assert!(first_dates.len() == self.buffer.len());
         self.buffer.copy_from_slice(first_dates);
@@ -199,16 +191,15 @@ impl DaysPatterns {
         }
 
         self.get_or_insert_from_buffer()
-
     }
 
-    pub fn get_union(&mut self, 
-        first_pattern: DaysPattern, 
-        second_pattern: DaysPattern, 
-    ) -> DaysPattern 
-    {
-        let first_dates = & self.days_patterns[first_pattern.idx].allowed_dates;
-        let second_dates = & self.days_patterns[second_pattern.idx].allowed_dates;
+    pub fn get_union(
+        &mut self,
+        first_pattern: DaysPattern,
+        second_pattern: DaysPattern,
+    ) -> DaysPattern {
+        let first_dates = &self.days_patterns[first_pattern.idx].allowed_dates;
+        let second_dates = &self.days_patterns[second_pattern.idx].allowed_dates;
 
         debug_assert!(first_dates.len() == self.buffer.len());
         self.buffer.copy_from_slice(first_dates);
@@ -219,45 +210,42 @@ impl DaysPatterns {
         }
 
         self.get_or_insert_from_buffer()
-
     }
 
-    pub fn common_days(&self, 
-        first_pattern : & DaysPattern, 
-        second_pattern : & DaysPattern, 
-        calendar : & Calendar
+    pub fn common_days(
+        &self,
+        first_pattern: &DaysPattern,
+        second_pattern: &DaysPattern,
+        calendar: &Calendar,
     ) -> Vec<DaysSinceDatasetStart> {
-
         let first_data = &self.days_patterns[first_pattern.idx].allowed_dates;
         let second_data = &self.days_patterns[second_pattern.idx].allowed_dates;
         let days = calendar.days();
         let mut result = Vec::new();
         for (day, (first, second)) in days.zip(first_data.iter().zip(second_data.iter())) {
-            if *first && *second { 
+            if *first && *second {
                 result.push(day);
             }
         }
         result
     }
 
-    pub fn have_common_day(&self, 
-        first_pattern : & DaysPattern, 
-        second_pattern : & DaysPattern, 
-    ) -> Option<DaysSinceDatasetStart> 
-    {
-
+    pub fn have_common_day(
+        &self,
+        first_pattern: &DaysPattern,
+        second_pattern: &DaysPattern,
+    ) -> Option<DaysSinceDatasetStart> {
         let first_data = &self.days_patterns[first_pattern.idx].allowed_dates;
         let second_data = &self.days_patterns[second_pattern.idx].allowed_dates;
-        first_data.iter().zip(second_data.iter())
-            .map(|(first, second)| {
-                * first && * second
-            })
+        first_data
+            .iter()
+            .zip(second_data.iter())
+            .map(|(first, second)| *first && *second)
             .enumerate()
             .find(|(_, is_common_day)| *is_common_day)
             .map(|(day_idx, _)| DaysSinceDatasetStart {
-                days : day_idx as u16
+                days: day_idx as u16,
             })
-
     }
 }
 

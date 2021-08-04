@@ -57,7 +57,7 @@ where
                 prefix_conf: None,
                 on_demand_transport: false,
                 on_demand_transport_comment: None,
-                read_as_line : false,
+                read_as_line: false,
             };
             info!("Reading gtfs from {:?}", &launch_params.input_data_path);
             use std::str::FromStr;
@@ -65,8 +65,8 @@ where
             let walking_speed = f64::from_str(transit_model::TRANSFER_WALKING_SPEED)?;
             let waiting_time = u32::from_str(transit_model::TRANSFER_WAITING_TIME)?;
 
-            let model =
-                transit_model::gtfs::Reader::new(configuration).parse(&launch_params.input_data_path)?;
+            let model = transit_model::gtfs::Reader::new(configuration)
+                .parse(&launch_params.input_data_path)?;
             let model = transit_model::transfers::generates_transfers(
                 model,
                 max_distance,

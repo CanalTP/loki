@@ -34,10 +34,14 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
-use std::{borrow::Borrow, cmp::{max, min, Ordering}, ops::Not};
+use crate::timetables::{FlowDirection, Stop, StopFlows};
+use std::{
+    borrow::Borrow,
+    cmp::{max, min, Ordering},
+    ops::Not,
+};
 use std::{collections::BTreeMap, fmt::Debug};
 use FlowDirection::{BoardAndDebark, BoardOnly, DebarkOnly, NoBoardDebark};
-use crate::timetables::{FlowDirection, Stop, StopFlows};
 
 #[derive(Debug)]
 pub(super) struct Timetables<Time, Load, TimezoneData, VehicleData> {
@@ -770,8 +774,7 @@ where
         let loads_cmp = partial_cmp(loads, self.vehicle_loads(vehicle_idx))?;
         combine(board_debark_cmp, loads_cmp)
     }
-    pub(super) fn remove_vehicle(&mut self, vehicle_idx : usize) -> Result<(), ()>
-    {
+    pub(super) fn remove_vehicle(&mut self, vehicle_idx: usize) -> Result<(), ()> {
         if vehicle_idx >= self.nb_of_vehicle() {
             return Err(());
         }
@@ -782,21 +785,24 @@ where
         for debark_times in self.debark_times_by_position.iter_mut() {
             debark_times.remove(vehicle_idx);
         }
-        
+
         self.vehicle_loads.remove(vehicle_idx);
         self.vehicle_datas.remove(vehicle_idx);
-
 
         Ok(())
     }
 
-    pub(super) fn remove_vehicles<Filter>(&mut self, vehicle_filter : Filter) -> Result<usize, ()> 
-        where Filter : Fn(&VehicleData) -> bool
+    pub(super) fn remove_vehicles<Filter>(&mut self, vehicle_filter: Filter) -> Result<usize, ()>
+    where
+        Filter: Fn(&VehicleData) -> bool,
     {
-
-        let nb_to_remove = self.vehicle_datas.iter().filter(|vehicle_data|  vehicle_filter(&vehicle_data)).count();
+        let nb_to_remove = self
+            .vehicle_datas
+            .iter()
+            .filter(|vehicle_data| vehicle_filter(&vehicle_data))
+            .count();
         if nb_to_remove == 0 {
-            return Err(())
+            return Err(());
         }
 
         //  Option 1 : use buffers to copy the data to keep, and then make swaps
@@ -804,7 +810,7 @@ where
         //
         //   Option 2 : use retain with a closure whose state tracks the current index/vehicle
         //              see https://stackoverflow.com/a/59602788
-        for board_times  in self.board_times_by_position.iter_mut() {
+        for board_times in self.board_times_by_position.iter_mut() {
             let mut index = 0;
             let vehicle_datas = &self.vehicle_datas;
             board_times.retain(|_| {
@@ -813,7 +819,7 @@ where
                 to_retain
             });
         }
-        for debark_times  in self.debark_times_by_position.iter_mut() {
+        for debark_times in self.debark_times_by_position.iter_mut() {
             let mut index = 0;
             let vehicle_datas = &self.vehicle_datas;
             debark_times.retain(|_| {
@@ -823,7 +829,7 @@ where
             });
         }
 
-        for vehicle_loads  in self.vehicle_loads.iter_mut() {
+        for vehicle_loads in self.vehicle_loads.iter_mut() {
             let mut index = 0;
             let vehicle_datas = &self.vehicle_datas;
             vehicle_loads.retain(|_| {
@@ -841,14 +847,11 @@ where
         }
 
         Ok(nb_to_remove)
-
     }
 
-    pub fn update_vehicles_data<Updater>(&mut self, 
-        mut updater : Updater, 
-    ) -> Result<usize, ()> 
-        where 
-            Updater : FnMut(&mut VehicleData) -> bool // returns true when an update took place
+    pub fn update_vehicles_data<Updater>(&mut self, mut updater: Updater) -> Result<usize, ()>
+    where
+        Updater: FnMut(&mut VehicleData) -> bool, // returns true when an update took place
     {
         let mut nb_updated = 0usize;
         for vehicle_data in self.vehicle_datas.iter_mut() {
@@ -856,17 +859,14 @@ where
             if updated {
                 nb_updated = nb_updated + 1;
             }
-
         }
-        
+
         match nb_updated {
             0 => Err(()),
-            _ => Ok(nb_updated)
+            _ => Ok(nb_updated),
         }
-        
     }
 }
-
 
 fn combine(a: Ordering, b: Ordering) -> Option<Ordering> {
     use Ordering::{Equal, Greater, Less};

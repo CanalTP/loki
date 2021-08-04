@@ -35,12 +35,12 @@
 // www.navitia.io
 
 mod daily;
+mod day_to_timetable;
 mod generic_timetables;
 mod iters;
 mod loads_daily;
 mod loads_periodic;
 mod periodic;
-mod day_to_timetable;
 
 pub use daily::DailyTimetables;
 pub use periodic::PeriodicTimetables;
@@ -149,10 +149,9 @@ pub trait Timetables: Types {
 
     fn remove(
         &mut self,
-        date: & chrono::NaiveDate,
+        date: &chrono::NaiveDate,
         vehicle_journey_idx: Idx<VehicleJourney>,
     ) -> Result<(), RemovalError>;
-
 }
 
 pub trait TimetablesIter<'a>: Types {
@@ -166,9 +165,8 @@ pub trait TimetablesIter<'a>: Types {
     fn missions(&'a self) -> Self::Missions;
 }
 
-
 pub enum RemovalError {
     UnknownDate,
     UnknownVehicleJourney,
-    DateInvalidForVehicleJourney
+    DateInvalidForVehicleJourney,
 }
