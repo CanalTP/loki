@@ -60,7 +60,7 @@ pub struct PeriodicTimetables {
     timetables: Timetables<SecondsSinceTimezonedDayStart, (), TimeZone, VehicleData>,
     calendar: Calendar,
     days_patterns: DaysPatterns,
-    pub(super) vehicle_journey_to_timetables : BTreeMap<Idx<VehicleJourney>, DayToTimetable>,
+    vehicle_journey_to_timetables : BTreeMap<Idx<VehicleJourney>, DayToTimetable>,
 }
  
 #[derive(Debug, Clone)]
@@ -289,10 +289,12 @@ impl TimetablesTrait for PeriodicTimetables {
             .or_insert_with(||DayToTimetable::new(&self.calendar));
 
         if let Some(day) = vj_timetables.has_intersection_with(&days_pattern, &self.days_patterns) {
-            warn!("Trying to add vehicle journey {} multiple time for day {}. Insertion skipped.",
+            warn!("Trying to add vehicle journey {} multiple time for day {}. Insertion skipped for all days.",
                 vehicle_journey.id,
                 self.calendar.to_naive_date(&day)
             );
+            // TODO : ? remove from days_pattern the days in the intersection and carry on with
+            //          the insertion instead of returning early ?
            return result;
         }
         
@@ -378,8 +380,8 @@ impl TimetablesTrait for PeriodicTimetables {
                 // by removing a day from the day_pattern, the day_pattern may have become empty
                 // in this case, we remove all vehicle with an empty day_pattern
                 timetable_data.remove_vehicles(|vehicle_data| {
-                    self.days_patterns.is_empty_pattern(&vehicle_data.days_pattern)
-                });
+                        self.days_patterns.is_empty_pattern(&vehicle_data.days_pattern)
+                    });
 
                 Ok(())
             }
