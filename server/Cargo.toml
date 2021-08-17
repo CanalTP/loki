@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prost = "0.6"
+prost = "0.8"
 zmq = "0.9"
 launch = { path = "../launch"}
 structopt = "0.3"
@@ -17,4 +17,4 @@ serde_json = "1.0"
 # log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
 
 [build-dependencies]
-prost-build = "0.6"
+prost-build = "0.8"
