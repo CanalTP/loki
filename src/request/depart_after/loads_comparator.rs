@@ -51,9 +51,9 @@ pub struct Request<'data, 'model, Data: DataTrait> {
 impl<'data, 'model, Data: DataTrait> TransitTypes for Request<'data, 'model, Data> {
     type Stop = Data::Stop;
     type Mission = Data::Mission;
+    type Position = Data::Position;
     type Trip = Data::Trip;
     type Transfer = Data::Transfer;
-    type Position = Data::Position;
 }
 
 impl<'data, 'model, Data: DataTrait> RequestTypes for Request<'data, 'model, Data> {

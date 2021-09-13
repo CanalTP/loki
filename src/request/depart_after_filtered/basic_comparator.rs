@@ -41,9 +41,11 @@ use crate::engine::engine_interface::{
 use crate::transit_data::data_interface::TransitTypes;
 use crate::transit_data::data_interface::{Data as DataTrait, DataIters, DataWithIters};
 
-use super::{Arrival, Arrivals, Criteria, Departure, Departures, GenericDepartAfterRequest};
+use super::{
+    Arrival, Arrivals, Criteria, Departure, Departures, GenericDepartAfterRequestFiltered,
+};
 pub struct Request<'data, 'model, Data: DataTrait> {
-    generic: GenericDepartAfterRequest<'data, 'model, Data>,
+    generic: GenericDepartAfterRequestFiltered<'data, 'model, Data>,
 }
 
 impl<'data, 'model, Data: DataTrait> TransitTypes for Request<'data, 'model, Data> {
@@ -231,7 +233,8 @@ where
     where
         Self: Sized,
     {
-        let generic_result = GenericDepartAfterRequest::new(model, transit_data, request_input);
+        let generic_result =
+            GenericDepartAfterRequestFiltered::new(model, transit_data, request_input);
         generic_result.map(|generic| Self { generic })
     }
 
