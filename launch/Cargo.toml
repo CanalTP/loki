@@ -17,6 +17,7 @@ slog-scope = "4.1"
 slog-stdlog = "4.0"
 slog-async = "2.3"
 slog-envlogger = "2.1"
+relational_types = "2.0.0"
 
 [dev-dependencies]
 failure = "0.1"

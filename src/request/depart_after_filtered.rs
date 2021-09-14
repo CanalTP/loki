@@ -37,12 +37,14 @@
 pub mod basic_comparator;
 
 use crate::{
+    engine,
     loads_data::LoadsCount,
     time::{PositiveDuration, SecondsSinceDatasetUTCStart},
     transit_data::data_interface::DataIters,
+    Idx, StopPoint,
 };
 
-use crate::engine::engine_interface::{BadRequest, RequestInput, RequestTypes};
+use crate::engine::engine_interface::{BadRequest, RequestTypes};
 use crate::transit_data::data_interface::Data as DataTrait;
 use transit_model::Model;
 
@@ -52,8 +54,9 @@ use crate::engine::engine_interface::Journey as PTJourney;
 use crate::request::generic_request::MaximizeDepartureTimeError;
 use crate::request::generic_request::MaximizeDepartureTimeError::{NoBoardTime, NoTrip};
 use crate::response;
+use std::collections::HashSet;
 
-pub struct GenericDepartAfterRequestFiltered<'data, 'model, Data: DataTrait> {
+pub struct GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data: DataTrait> {
     pub(super) transit_data: &'data Data,
     pub(super) model: &'model Model,
     pub(super) departure_datetime: SecondsSinceDatasetUTCStart,
@@ -64,16 +67,18 @@ pub struct GenericDepartAfterRequestFiltered<'data, 'model, Data: DataTrait> {
     pub(super) max_arrival_time: SecondsSinceDatasetUTCStart,
     pub(super) max_nb_legs: u8,
     pub(super) too_late_threshold: PositiveDuration,
+    pub(super) forbidden_sp_idx: &'request HashSet<Idx<StopPoint>>,
+    pub(super) allowed_sp_idx: &'request HashSet<Idx<StopPoint>>,
 }
 
-impl<'data, 'model, Data> GenericDepartAfterRequestFiltered<'data, 'model, Data>
+impl<'data, 'model, 'request, Data> GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data>
 where
     Data: DataTrait,
 {
     pub fn new(
         model: &'model transit_model::Model,
         transit_data: &'data Data,
-        request_input: &RequestInput,
+        request_input: &'request engine::engine_interface::RequestInput,
     ) -> Result<Self, BadRequest>
     where
         Self: Sized,
@@ -83,16 +88,18 @@ where
             transit_data.calendar(),
         )?;
 
-        let departures = super::generic_request::parse_departures(
+        let departures = super::generic_request::parse_departures_filtered(
             &request_input.departures_stop_point_and_fallback_duration,
             model,
             transit_data,
+            |sp_idx| !request_input.forbidden_sp_idx.contains(&sp_idx),
         )?;
 
-        let arrivals: Vec<_> = super::generic_request::parse_arrivals(
+        let arrivals: Vec<_> = super::generic_request::parse_arrivals_filtered(
             &request_input.arrivals_stop_point_and_fallback_duration,
             model,
             transit_data,
+            |sp_idx| !request_input.forbidden_sp_idx.contains(&sp_idx),
         )?;
 
         let result = Self {
@@ -106,6 +113,8 @@ where
             max_arrival_time: departure_datetime + request_input.max_journey_duration,
             max_nb_legs: request_input.max_nb_of_legs,
             too_late_threshold: request_input.too_late_threshold,
+            forbidden_sp_idx: &request_input.forbidden_sp_idx,
+            allowed_sp_idx: &request_input.allowed_sp_idx,
         };
 
         Ok(result)
@@ -423,7 +432,8 @@ where
     }
 }
 
-impl<'data, 'model, 'outer, Data> GenericDepartAfterRequestFiltered<'data, 'model, Data>
+impl<'data, 'model, 'request, 'outer, Data>
+    GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data>
 where
     Data: DataTrait + DataIters<'outer>,
     Data::Transfer: 'outer,

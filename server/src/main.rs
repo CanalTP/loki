@@ -61,6 +61,7 @@ use failure::{bail, format_err, Error};
 use std::convert::TryFrom;
 
 use launch::datetime::DateTimeRepresent;
+use launch::filter_utility::create_filter_idx;
 use serde::{Deserialize, Serialize};
 
 #[derive(StructOpt)]
@@ -404,6 +405,11 @@ where
         config.request_default_params.max_nb_of_legs
     });
 
+    let (forbidden_sp_idx, allowed_sp_idx) = create_filter_idx(
+        model,
+        &journey_request.forbidden_uris,
+        &journey_request.allowed_id,
+    );
     let request_input = RequestInput {
         datetime: departure_datetime,
         departures_stop_point_and_fallback_duration,
@@ -413,6 +419,8 @@ where
         max_nb_of_legs,
         max_journey_duration,
         too_late_threshold: config.request_default_params.too_late_threshold,
+        forbidden_sp_idx,
+        allowed_sp_idx,
     };
 
     let datetime_represent = match journey_request.clockwise {

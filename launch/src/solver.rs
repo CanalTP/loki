@@ -74,8 +74,11 @@ impl<Data: DataTrait> Solver<Data> {
         use crate::datetime::DateTimeRepresent::*;
         use config::ComparatorType::*;
 
-        let responses = match (datetime_represent, comparator_type) {
-            (Arrival, Loads) => {
+        let filtered_request =
+            request_input.forbidden_sp_idx.is_empty() && request_input.allowed_sp_idx.is_empty();
+
+        let responses = match (datetime_represent, comparator_type, filtered_request) {
+            (Arrival, Loads, true) => {
                 let request = request::arrive_before::loads_comparator::Request::new(
                     model,
                     data,
@@ -83,7 +86,7 @@ impl<Data: DataTrait> Solver<Data> {
                 )?;
                 solve_request_inner(&mut self.engine, &request, data)
             }
-            (Departure, Loads) => {
+            (Departure, Loads, true) => {
                 let request = request::depart_after::loads_comparator::Request::new(
                     model,
                     data,
@@ -91,7 +94,7 @@ impl<Data: DataTrait> Solver<Data> {
                 )?;
                 solve_request_inner(&mut self.engine, &request, data)
             }
-            (Arrival, Basic) => {
+            (Arrival, Basic, true) => {
                 let request = request::arrive_before::basic_comparator::Request::new(
                     model,
                     data,
@@ -99,7 +102,7 @@ impl<Data: DataTrait> Solver<Data> {
                 )?;
                 solve_request_inner(&mut self.engine, &request, data)
             }
-            (Departure, Basic) => {
+            (Departure, Basic, true) => {
                 let request = request::depart_after::basic_comparator::Request::new(
                     model,
                     data,
@@ -107,19 +110,28 @@ impl<Data: DataTrait> Solver<Data> {
                 )?;
                 solve_request_inner(&mut self.engine, &request, data)
             }
+            (Departure, Basic, false) => {
+                let request = request::depart_after_filtered::basic_comparator::Request::new(
+                    model,
+                    data,
+                    request_input,
+                )?;
+                solve_request_inner(&mut self.engine, &request, data)
+            }
+            _ => return Err(BadRequest::NoValidDepartureStop),
         };
         Ok(responses)
     }
 }
 
-fn solve_request_inner<'data, 'model, Data, Request, Types>(
+fn solve_request_inner<'data, 'model, 'request, Data, Request, Types>(
     engine: &mut MultiCriteriaRaptor<Types>,
-    request: &Request,
+    request: &'request Request,
     data: &'data Data,
 ) -> Vec<response::Response>
 where
     Request: RequestWithIters,
-    Request: RequestIO<'data, 'model, Data> + RequestDebug,
+    Request: RequestIO<'data, 'model, 'request, Data> + RequestDebug,
     Data: DataTrait,
     Types: RequestTypes<
         Position = Request::Position,

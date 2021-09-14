@@ -37,6 +37,7 @@
 use loki::{transit_model, NaiveDateTime, PositiveDuration, RequestInput};
 
 use crate::config::RequestParams;
+use std::collections::HashSet;
 
 pub fn make_query_stop_areas(
     model: &transit_model::Model,
@@ -59,6 +60,8 @@ pub fn make_query_stop_areas(
         max_nb_of_legs: request_params.max_nb_of_legs,
         max_journey_duration: request_params.max_journey_duration,
         too_late_threshold: request_params.too_late_threshold,
+        forbidden_sp_idx: HashSet::new(),
+        allowed_sp_idx: HashSet::new(),
     };
 
     Ok(request_input)

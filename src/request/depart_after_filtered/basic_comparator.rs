@@ -44,11 +44,13 @@ use crate::transit_data::data_interface::{Data as DataTrait, DataIters, DataWith
 use super::{
     Arrival, Arrivals, Criteria, Departure, Departures, GenericDepartAfterRequestFiltered,
 };
-pub struct Request<'data, 'model, Data: DataTrait> {
-    generic: GenericDepartAfterRequestFiltered<'data, 'model, Data>,
+pub struct Request<'data, 'model, 'request, Data: DataTrait> {
+    generic: GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data>,
 }
 
-impl<'data, 'model, Data: DataTrait> TransitTypes for Request<'data, 'model, Data> {
+impl<'data, 'model, 'request, Data: DataTrait> TransitTypes
+    for Request<'data, 'model, 'request, Data>
+{
     type Stop = Data::Stop;
     type Mission = Data::Mission;
     type Position = Data::Position;
@@ -56,13 +58,17 @@ impl<'data, 'model, Data: DataTrait> TransitTypes for Request<'data, 'model, Dat
     type Transfer = Data::Transfer;
 }
 
-impl<'data, 'model, Data: DataTrait> RequestTypes for Request<'data, 'model, Data> {
+impl<'data, 'model, 'request, Data: DataTrait> RequestTypes
+    for Request<'data, 'model, 'request, Data>
+{
     type Departure = Departure;
     type Arrival = Arrival;
     type Criteria = Criteria;
 }
 
-impl<'data, 'model, Data: DataTrait> RequestTrait for Request<'data, 'model, Data> {
+impl<'data, 'model, 'request, Data: DataTrait> RequestTrait
+    for Request<'data, 'model, 'request, Data>
+{
     fn is_lower(&self, lower: &Self::Criteria, upper: &Self::Criteria) -> bool {
         let arrival_penalty = self.generic.leg_arrival_penalty();
         let walking_penalty = self.generic.leg_walking_penalty();
@@ -179,20 +185,21 @@ impl<'data, 'model, Data: DataTrait> RequestTrait for Request<'data, 'model, Dat
     }
 }
 
-impl<'data, 'model, 'outer, Data> RequestIters<'outer> for Request<'data, 'model, Data>
+impl<'data, 'model, 'request, 'outer, Data> RequestIters<'outer>
+    for Request<'data, 'model, 'request, Data>
 where
     Data: DataTrait + DataIters<'outer>,
     Data::Transfer: 'outer,
     Data::Stop: 'outer,
 {
-    type Departures = Departures;
-    fn departures(&'outer self) -> Self::Departures {
-        self.generic.departures()
-    }
-
     type Arrivals = Arrivals;
     fn arrivals(&'outer self) -> Self::Arrivals {
         self.generic.arrivals()
+    }
+
+    type Departures = Departures;
+    fn departures(&'outer self) -> Self::Departures {
+        self.generic.departures()
     }
 
     type MissionsAtStop = Data::MissionsAtStop;
@@ -215,20 +222,23 @@ where
     }
 }
 
-impl<'data, 'model, Data> RequestWithIters for Request<'data, 'model, Data> where Data: DataWithIters
-{}
+impl<'data, 'model, 'request, Data> RequestWithIters for Request<'data, 'model, 'request, Data> where
+    Data: DataWithIters
+{
+}
 
 use crate::engine::engine_interface::Journey as PTJourney;
 use crate::response;
 
-impl<'data, 'model, Data> RequestIO<'data, 'model, Data> for Request<'data, 'model, Data>
+impl<'data, 'model, 'request, Data> RequestIO<'data, 'model, 'request, Data>
+    for Request<'data, 'model, 'request, Data>
 where
     Data: DataTrait,
 {
     fn new(
         model: &'model transit_model::Model,
         transit_data: &'data Data,
-        request_input: &RequestInput,
+        request_input: &'request RequestInput,
     ) -> Result<Self, BadRequest>
     where
         Self: Sized,
@@ -263,7 +273,7 @@ where
     }
 }
 
-impl<'data, 'model, Data> RequestDebug for Request<'data, 'model, Data>
+impl<'data, 'model, 'request, Data> RequestDebug for Request<'data, 'model, 'request, Data>
 where
     Data: DataTrait,
 {

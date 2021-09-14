@@ -40,7 +40,7 @@ use crate::{
     loads_data::LoadsCount,
     time::{Calendar, PositiveDuration, SecondsSinceDatasetUTCStart},
     transit_data::data_interface::TransitTypes,
-    RequestTypes,
+    Idx, RequestTypes,
 };
 
 use crate::engine::engine_interface::BadRequest;
@@ -48,6 +48,7 @@ use crate::transit_data::data_interface::Data as DataTrait;
 use chrono::NaiveDateTime;
 use log::warn;
 use std::fmt::Debug;
+use transit_model::objects::StopPoint;
 use transit_model::Model;
 
 #[derive(Clone)]
@@ -153,9 +154,35 @@ pub(super) fn parse_departures<Data>(
 where
     Data: DataTrait,
 {
+    parse_departures_filtered(
+        departures_stop_point_and_fallback_duration,
+        model,
+        transit_data,
+        |_| true,
+    )
+}
+
+pub(super) fn parse_departures_filtered<Data, Filter>(
+    departures_stop_point_and_fallback_duration: &[(String, PositiveDuration)],
+    model: &Model,
+    transit_data: &Data,
+    filter: Filter,
+) -> Result<Vec<(Data::Stop, PositiveDuration)>, BadRequest>
+where
+    Data: DataTrait,
+    Filter: Fn(Idx<StopPoint>) -> bool,
+{
     let result: Vec<_> = departures_stop_point_and_fallback_duration
         .iter()
         .enumerate()
+        .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
+            let stop_idx = model.stop_points.get_idx(stop_point_uri).or(None)?;
+            if filter(stop_idx) {
+                Some((idx, (stop_point_uri, fallback_duration)))
+            } else {
+                None
+            }
+        })
         .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
             let stop_idx = model.stop_points.get_idx(stop_point_uri).or_else(|| {
                 warn!(
@@ -190,9 +217,35 @@ pub(super) fn parse_arrivals<Data>(
 where
     Data: DataTrait,
 {
+    parse_arrivals_filtered(
+        arrivals_stop_point_and_fallback_duration,
+        model,
+        transit_data,
+        |_| true,
+    )
+}
+
+pub(super) fn parse_arrivals_filtered<Data, Filter>(
+    arrivals_stop_point_and_fallback_duration: &[(String, PositiveDuration)],
+    model: &Model,
+    transit_data: &Data,
+    filter: Filter,
+) -> Result<Vec<(Data::Stop, PositiveDuration)>, BadRequest>
+where
+    Data: DataTrait,
+    Filter: Fn(Idx<StopPoint>) -> bool,
+{
     let result: Vec<_> = arrivals_stop_point_and_fallback_duration
         .iter()
         .enumerate()
+        .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
+            let stop_idx = model.stop_points.get_idx(stop_point_uri).or(None)?;
+            if filter(stop_idx) {
+                Some((idx, (stop_point_uri, fallback_duration)))
+            } else {
+                None
+            }
+        })
         .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
             let stop_idx = model.stop_points.get_idx(stop_point_uri).or_else(|| {
                 warn!(
