@@ -147,10 +147,10 @@ pub fn create_filter_idx(
 
     let mut forbidden_line_idx: IdxSet<Line> = IdxSet::new();
     let mut allowed_line_idx: IdxSet<Line> = IdxSet::new();
-    let mut forbidden_route_idx: IdxSet<Line> = IdxSet::new();
-    let mut allowed_route_idx: IdxSet<Line> = IdxSet::new();
-    let mut forbidden_network_idx: IdxSet<Line> = IdxSet::new();
-    let mut allowed_network_idx: IdxSet<Line> = IdxSet::new();
+    let mut forbidden_route_idx: IdxSet<Route> = IdxSet::new();
+    let mut allowed_route_idx: IdxSet<Route> = IdxSet::new();
+    let mut forbidden_network_idx: IdxSet<Network> = IdxSet::new();
+    let mut allowed_network_idx: IdxSet<Network> = IdxSet::new();
 
     for s in forbidden_uri {
         let out = parse_filter(s.as_str());
@@ -159,6 +159,18 @@ pub fn create_filter_idx(
                 let line_idx = model.lines.get_idx(line);
                 if let Some(idx) = line_idx {
                     forbidden_line_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Route(route)) => {
+                let route_idx = model.routes.get_idx(route);
+                if let Some(idx) = route_idx {
+                    forbidden_route_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Network(network)) => {
+                let network_idx = model.networks.get_idx(network);
+                if let Some(idx) = network_idx {
+                    forbidden_network_idx.insert(idx);
                 }
             }
             _ => (),
