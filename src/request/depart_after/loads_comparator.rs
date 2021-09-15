@@ -131,12 +131,12 @@ impl<'data, 'model, Data: DataTrait> RequestTrait for Request<'data, 'model, Dat
         self.generic.depart(departure)
     }
 
-    fn arrival_stop(&self, arrival: &Self::Arrival) -> Self::Stop {
-        self.generic.arrival_stop(arrival)
-    }
-
     fn arrive(&self, arrival: &Self::Arrival, criteria: &Self::Criteria) -> Self::Criteria {
         self.generic.arrive(arrival, criteria)
+    }
+
+    fn arrival_stop(&self, arrival: &Self::Arrival) -> Self::Stop {
+        self.generic.arrival_stop(arrival)
     }
 
     fn is_upstream(
@@ -187,14 +187,14 @@ where
     Data::Transfer: 'outer,
     Data::Stop: 'outer,
 {
-    type Departures = Departures;
-    fn departures(&'outer self) -> Self::Departures {
-        self.generic.departures()
-    }
-
     type Arrivals = Arrivals;
     fn arrivals(&'outer self) -> Self::Arrivals {
         self.generic.arrivals()
+    }
+
+    type Departures = Departures;
+    fn departures(&'outer self) -> Self::Departures {
+        self.generic.departures()
     }
 
     type MissionsAtStop = Data::MissionsAtStop;
@@ -228,8 +228,7 @@ where
 use crate::engine::engine_interface::Journey as PTJourney;
 use crate::response;
 
-impl<'data, 'model, 'request, Data> RequestIO<'data, 'model, 'request, Data>
-    for Request<'data, 'model, Data>
+impl<'data, 'model, Data> RequestIO<'data, 'model, Data> for Request<'data, 'model, Data>
 where
     Data: DataTrait,
 {

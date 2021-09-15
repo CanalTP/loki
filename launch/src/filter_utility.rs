@@ -37,7 +37,6 @@
 use crate::loki::transit_model::objects::StopArea;
 use crate::loki::transit_model::Model;
 use crate::loki::{Idx, StopPoint};
-use loki::log::info;
 use loki::transit_model::model::GetCorresponding;
 use relational_types::IdxSet;
 use std::collections::HashSet;

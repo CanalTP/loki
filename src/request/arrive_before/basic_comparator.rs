@@ -219,15 +219,14 @@ impl<'data, 'model, Data> RequestWithIters for Request<'data, 'model, Data> wher
 use crate::engine::engine_interface::Journey as PTJourney;
 use crate::response;
 
-impl<'data, 'model, 'request, Data> RequestIO<'data, 'model, 'request, Data>
-    for Request<'data, 'model, Data>
+impl<'data, 'model, Data> RequestIO<'data, 'model, Data> for Request<'data, 'model, Data>
 where
     Data: DataTrait,
 {
     fn new(
         model: &'model transit_model::Model,
         transit_data: &'data Data,
-        request_input: &'request RequestInput,
+        request_input: &RequestInput,
     ) -> Result<Self, BadRequest>
     where
         Self: Sized,

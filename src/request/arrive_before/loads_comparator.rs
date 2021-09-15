@@ -225,8 +225,7 @@ where
 use crate::engine::engine_interface::Journey as PTJourney;
 use crate::response;
 
-impl<'data, 'model, 'request, Data> RequestIO<'data, 'model, 'request, Data>
-    for Request<'data, 'model, Data>
+impl<'data, 'model, Data> RequestIO<'data, 'model, Data> for Request<'data, 'model, Data>
 where
     Data: DataTrait,
 {

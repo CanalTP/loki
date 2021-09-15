@@ -124,14 +124,14 @@ impl<Data: DataTrait> Solver<Data> {
     }
 }
 
-fn solve_request_inner<'data, 'model, 'request, Data, Request, Types>(
+fn solve_request_inner<'data, 'model, Data, Request, Types>(
     engine: &mut MultiCriteriaRaptor<Types>,
-    request: &'request Request,
+    request: &Request,
     data: &'data Data,
 ) -> Vec<response::Response>
 where
     Request: RequestWithIters,
-    Request: RequestIO<'data, 'model, 'request, Data> + RequestDebug,
+    Request: RequestIO<'data, 'model, Data> + RequestDebug,
     Data: DataTrait,
     Types: RequestTypes<
         Position = Request::Position,

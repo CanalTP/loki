@@ -245,11 +245,11 @@ pub struct RequestInput {
     pub allowed_sp_idx: HashSet<Idx<StopPoint>>,
 }
 
-pub trait RequestIO<'data, 'model, 'request, Data: data_interface::Data>: Request {
+pub trait RequestIO<'data, 'model, Data: data_interface::Data>: Request {
     fn new(
         model: &'model transit_model::Model,
         transit_data: &'data Data,
-        request_input: &'request RequestInput,
+        request_input: &RequestInput,
     ) -> Result<Self, BadRequest>
     where
         Self: Sized;

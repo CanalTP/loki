@@ -465,17 +465,17 @@ where
     }
 }
 
-pub struct TransferAtStop<'data, Data>
+pub struct TransferAtStop<'outer, Data>
 where
-    Data: DataTrait + DataIters<'data>,
+    Data: DataTrait + DataIters<'outer>,
 {
     inner: Data::OutgoingTransfersAtStop,
     criteria: Criteria,
 }
 
-impl<'data, Data> Iterator for TransferAtStop<'data, Data>
+impl<'outer, Data> Iterator for TransferAtStop<'outer, Data>
 where
-    Data: DataTrait + DataIters<'data>,
+    Data: DataTrait + DataIters<'outer>,
 {
     type Item = (Data::Stop, Criteria, Data::Transfer);
 

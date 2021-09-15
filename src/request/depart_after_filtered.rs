@@ -56,7 +56,7 @@ use crate::request::generic_request::MaximizeDepartureTimeError::{NoBoardTime, N
 use crate::response;
 use std::collections::HashSet;
 
-pub struct GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data: DataTrait> {
+pub struct GenericDepartAfterRequestFiltered<'data, 'model, Data: DataTrait> {
     pub(super) transit_data: &'data Data,
     pub(super) model: &'model Model,
     pub(super) departure_datetime: SecondsSinceDatasetUTCStart,
@@ -67,18 +67,18 @@ pub struct GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data: Data
     pub(super) max_arrival_time: SecondsSinceDatasetUTCStart,
     pub(super) max_nb_legs: u8,
     pub(super) too_late_threshold: PositiveDuration,
-    pub(super) forbidden_sp_idx: &'request HashSet<Idx<StopPoint>>,
-    pub(super) allowed_sp_idx: &'request HashSet<Idx<StopPoint>>,
+    pub(super) forbidden_sp_idx: HashSet<Idx<StopPoint>>,
+    pub(super) allowed_sp_idx: HashSet<Idx<StopPoint>>,
 }
 
-impl<'data, 'model, 'request, Data> GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data>
+impl<'data, 'model, Data> GenericDepartAfterRequestFiltered<'data, 'model, Data>
 where
     Data: DataTrait,
 {
     pub fn new(
         model: &'model transit_model::Model,
         transit_data: &'data Data,
-        request_input: &'request engine::engine_interface::RequestInput,
+        request_input: &engine::engine_interface::RequestInput,
     ) -> Result<Self, BadRequest>
     where
         Self: Sized,
@@ -113,8 +113,8 @@ where
             max_arrival_time: departure_datetime + request_input.max_journey_duration,
             max_nb_legs: request_input.max_nb_of_legs,
             too_late_threshold: request_input.too_late_threshold,
-            forbidden_sp_idx: &request_input.forbidden_sp_idx,
-            allowed_sp_idx: &request_input.allowed_sp_idx,
+            forbidden_sp_idx: request_input.forbidden_sp_idx.clone(),
+            allowed_sp_idx: request_input.allowed_sp_idx.clone(),
         };
 
         Ok(result)
@@ -432,8 +432,7 @@ where
     }
 }
 
-impl<'data, 'model, 'request, 'outer, Data>
-    GenericDepartAfterRequestFiltered<'data, 'model, 'request, Data>
+impl<'data, 'model, 'outer, Data> GenericDepartAfterRequestFiltered<'data, 'model, Data>
 where
     Data: DataTrait + DataIters<'outer>,
     Data::Transfer: 'outer,
@@ -461,9 +460,11 @@ where
         &'outer self,
         from_stop: &Data::Stop,
         criteria: &Criteria,
-    ) -> TransferAtStop<'outer, Data> {
+    ) -> TransferAtStop<'outer, 'data, 'model, Data> {
         let outgoing_transfers = self.transit_data.outgoing_transfers_at(from_stop);
         TransferAtStop {
+            from_stop: from_stop.clone(),
+            request: &self,
             inner: outgoing_transfers,
             criteria: criteria.clone(),
         }
@@ -474,30 +475,44 @@ where
     }
 }
 
-pub struct TransferAtStop<'data, Data>
+pub struct TransferAtStop<'outer, 'data, 'model, Data>
 where
-    Data: DataTrait + DataIters<'data>,
+    Data: DataTrait + DataIters<'outer>,
+    'data: 'outer,
+    'model: 'outer,
 {
+    from_stop: Data::Stop,
+    request: &'outer GenericDepartAfterRequestFiltered<'data, 'model, Data>,
     inner: Data::OutgoingTransfersAtStop,
     criteria: Criteria,
 }
 
-impl<'data, Data> Iterator for TransferAtStop<'data, Data>
+impl<'outer, 'data, 'model, Data> Iterator for TransferAtStop<'outer, 'data, 'model, Data>
 where
-    Data: DataTrait + DataIters<'data>,
+    Data: DataTrait + DataIters<'outer>,
 {
     type Item = (Data::Stop, Criteria, Data::Transfer);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(stop, durations, transfer)| {
-            let new_criteria = Criteria {
-                time: self.criteria.time + durations.total_duration,
-                nb_of_legs: self.criteria.nb_of_legs,
-                fallback_duration: self.criteria.fallback_duration,
-                transfers_duration: self.criteria.transfers_duration + durations.walking_duration,
-                loads_count: self.criteria.loads_count.clone(),
-            };
-            (stop.clone(), new_criteria, transfer.clone())
-        })
+        self.inner
+            // .filter(|(stop, durations, transfer)| {
+            //     /*let from_sp_idx = self.transit_data.stop_point_idx(self.from_stop);
+            //     let to_sp_idx = self.transit_data.stop_point_idx(stop);
+            //     !self.forbidden_sp_idx.contains(&from_sp_idx)
+            //         && !self.forbidden_sp_idx.contains(&to_sp_idx)*/
+            //     true
+            // })
+            .next()
+            .map(|(stop, durations, transfer)| {
+                let new_criteria = Criteria {
+                    time: self.criteria.time + durations.total_duration,
+                    nb_of_legs: self.criteria.nb_of_legs,
+                    fallback_duration: self.criteria.fallback_duration,
+                    transfers_duration: self.criteria.transfers_duration
+                        + durations.walking_duration,
+                    loads_count: self.criteria.loads_count.clone(),
+                };
+                (stop.clone(), new_criteria, transfer.clone())
+            })
     }
 }
