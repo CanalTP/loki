@@ -184,8 +184,6 @@ where
     Data: DataTrait + DataIters<'outer>,
     Data::Transfer: 'outer,
     Data::Stop: 'outer,
-    'data: 'outer,
-    'model: 'outer,
 {
     type Arrivals = Arrivals;
     fn arrivals(&'outer self) -> Self::Arrivals {
@@ -202,7 +200,7 @@ where
         self.generic.boardable_missions_at(stop)
     }
 
-    type TransfersAtStop = super::TransferAtStop<'outer, 'data, 'model, Data>;
+    type TransfersAtStop = super::TransferAtStop<'data, 'outer, Data>;
     fn transfers_at(
         &'outer self,
         from_stop: &Self::Stop,

@@ -460,11 +460,13 @@ where
         &'outer self,
         from_stop: &Data::Stop,
         criteria: &Criteria,
-    ) -> TransferAtStop<'outer, 'data, 'model, Data> {
+    ) -> TransferAtStop<'data, 'outer, Data> {
         let outgoing_transfers = self.transit_data.outgoing_transfers_at(from_stop);
         TransferAtStop {
             from_stop: from_stop.clone(),
-            request: &self,
+            model: &self.model,
+            data: &self.transit_data,
+            forbidden: &self.forbidden_sp_idx,
             inner: outgoing_transfers,
             criteria: criteria.clone(),
         }
@@ -475,44 +477,48 @@ where
     }
 }
 
-pub struct TransferAtStop<'outer, 'data, 'model, Data>
+pub struct TransferAtStop<'data, 'outer, Data>
 where
     Data: DataTrait + DataIters<'outer>,
-    'data: 'outer,
-    'model: 'outer,
 {
     from_stop: Data::Stop,
-    request: &'outer GenericDepartAfterRequestFiltered<'data, 'model, Data>,
+    model: &'outer Model,
+    data: &'data Data,
+    forbidden: &'outer HashSet<Idx<StopPoint>>,
     inner: Data::OutgoingTransfersAtStop,
     criteria: Criteria,
 }
 
-impl<'outer, 'data, 'model, Data> Iterator for TransferAtStop<'outer, 'data, 'model, Data>
+impl<'data, 'outer, Data> Iterator for TransferAtStop<'data, 'outer, Data>
 where
     Data: DataTrait + DataIters<'outer>,
 {
     type Item = (Data::Stop, Criteria, Data::Transfer);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            // .filter(|(stop, durations, transfer)| {
-            //     /*let from_sp_idx = self.transit_data.stop_point_idx(self.from_stop);
-            //     let to_sp_idx = self.transit_data.stop_point_idx(stop);
-            //     !self.forbidden_sp_idx.contains(&from_sp_idx)
-            //         && !self.forbidden_sp_idx.contains(&to_sp_idx)*/
-            //     true
-            // })
-            .next()
-            .map(|(stop, durations, transfer)| {
-                let new_criteria = Criteria {
-                    time: self.criteria.time + durations.total_duration,
-                    nb_of_legs: self.criteria.nb_of_legs,
-                    fallback_duration: self.criteria.fallback_duration,
-                    transfers_duration: self.criteria.transfers_duration
-                        + durations.walking_duration,
-                    loads_count: self.criteria.loads_count.clone(),
-                };
-                (stop.clone(), new_criteria, transfer.clone())
-            })
+        loop {
+            match self.inner.next() {
+                None => {
+                    return None;
+                }
+                Some((stop, durations, transfer)) => {
+                    let from_sp_idx = self.data.stop_point_idx(&self.from_stop);
+                    let to_sp_idx = self.data.stop_point_idx(stop);
+                    if self.forbidden.contains(&from_sp_idx) || self.forbidden.contains(&to_sp_idx)
+                    {
+                        continue;
+                    }
+                    let new_criteria = Criteria {
+                        time: self.criteria.time + durations.total_duration,
+                        nb_of_legs: self.criteria.nb_of_legs,
+                        fallback_duration: self.criteria.fallback_duration,
+                        transfers_duration: self.criteria.transfers_duration
+                            + durations.walking_duration,
+                        loads_count: self.criteria.loads_count.clone(),
+                    };
+                    return Some((stop.clone(), new_criteria, transfer.clone()));
+                }
+            }
+        }
     }
 }
