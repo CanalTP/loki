@@ -214,13 +214,8 @@ where
     }
 }
 
-impl<'data, 'model, Data> RequestWithIters for Request<'data, 'model, Data>
-where
-    Data: DataWithIters,
-    Data::Transfer: 'static,
-    Data::Stop: 'static,
-{
-}
+impl<'data, 'model, Data> RequestWithIters for Request<'data, 'model, Data> where Data: DataWithIters
+{}
 
 use crate::engine::engine_interface::Journey as PTJourney;
 use crate::response;
