@@ -1,6 +1,7 @@
 use crate::{
     loads_data::{Load, LoadsData},
     time::{PositiveDuration, SecondsSinceDatasetUTCStart},
+    timetables::generic_timetables::VehicleDataTrait,
 };
 use chrono::{NaiveDate, NaiveDateTime};
 use transit_model::{
@@ -28,6 +29,8 @@ pub trait TransitTypes {
 
     /// Identify a foot transfer between two `Stop`s
     type Transfer: Debug + Clone + 'static;
+
+    type VehicleData: Debug + Clone + VehicleDataTrait;
 }
 
 pub trait Data: TransitTypes {
@@ -111,6 +114,16 @@ pub trait Data: TransitTypes {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>;
+
+    fn earliest_filtered_trip_to_board_at<Filter>(
+        &self,
+        waiting_time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&Self::VehicleData) -> bool;
 
     fn latest_trip_that_debark_at(
         &self,

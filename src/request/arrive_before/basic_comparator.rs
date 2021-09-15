@@ -52,6 +52,7 @@ impl<'data, 'model, Data: DataTrait> TransitTypes for Request<'data, 'model, Dat
     type Position = Data::Position;
     type Trip = Data::Trip;
     type Transfer = Data::Transfer;
+    type VehicleData = Data::VehicleData;
 }
 
 impl<'data, 'model, Data: DataTrait> RequestTypes for Request<'data, 'model, Data> {

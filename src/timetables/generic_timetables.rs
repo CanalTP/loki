@@ -42,6 +42,8 @@ use std::{collections::BTreeMap, fmt::Debug};
 use FlowDirection::{BoardAndDebark, BoardOnly, DebarkOnly, NoBoardDebark};
 
 use crate::timetables::{FlowDirection, Stop, StopFlows};
+use transit_model::objects::VehicleJourney;
+use typed_index_collection::Idx;
 
 #[derive(Debug)]
 pub(super) struct Timetables<Time, Load, TimezoneData, VehicleData> {
@@ -101,6 +103,10 @@ pub struct Position {
 pub struct Vehicle {
     pub(super) timetable: Timetable,
     pub(super) idx: usize,
+}
+
+pub trait VehicleDataTrait {
+    fn get_vehicle_journey_idx(&self) -> Idx<VehicleJourney>;
 }
 
 impl<Time, Load, TimezoneData, VehicleData> Timetables<Time, Load, TimezoneData, VehicleData>
@@ -256,7 +262,12 @@ where
         timetable: &Timetable,
         position: &Position,
     ) -> Option<(Vehicle, &Time, &Load)> {
-        self.earliest_filtered_vehicle_to_board(waiting_time, timetable, position, |_| true)
+        self.earliest_filtered_vehicle_to_board(
+            waiting_time,
+            timetable,
+            position,
+            |_: &VehicleData| true,
+        )
     }
 
     pub(super) fn earliest_filtered_vehicle_to_board<Filter>(

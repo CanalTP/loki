@@ -34,10 +34,12 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
-use crate::loki::transit_model::objects::StopArea;
-use crate::loki::transit_model::Model;
-use crate::loki::{Idx, StopPoint};
-use loki::transit_model::model::GetCorresponding;
+use crate::loki::Idx;
+use loki::transit_model::{
+    model::GetCorresponding,
+    objects::{Line, Network, Route, StopArea, StopPoint, VehicleJourney},
+    Model,
+};
 use relational_types::IdxSet;
 use std::collections::HashSet;
 
@@ -50,6 +52,13 @@ pub enum FilterType<'a> {
     Network(&'a str),
     PhysicalMode(&'a str),
     CommercialMode(&'a str),
+}
+
+pub struct Filters {
+    pub forbidden_sp_idx: HashSet<Idx<StopPoint>>,
+    pub allowed_sp_idx: HashSet<Idx<StopPoint>>,
+    pub forbidden_vj_idx: HashSet<Idx<VehicleJourney>>,
+    pub allowed_vj_idx: HashSet<Idx<VehicleJourney>>,
 }
 
 pub fn parse_filter(input: &str) -> Option<FilterType> {
@@ -81,7 +90,7 @@ pub fn create_filter_idx(
     model: &Model,
     forbidden_uri: &[String],
     allowed_uri: &[String],
-) -> (HashSet<Idx<StopPoint>>, HashSet<Idx<StopPoint>>) {
+) -> Filters {
     let mut forbidden_sp_idx = HashSet::new();
     let mut allowed_sp_idx = HashSet::new();
 
@@ -132,11 +141,53 @@ pub fn create_filter_idx(
     let sp_into_allowed_sa: IdxSet<StopPoint> = allowed_sa_idx.get_corresponding(model);
     allowed_sp_idx.extend(sp_into_allowed_sa);
 
-    for s in &forbidden_sp_idx {
-        println!("{:?}", s);
+    //Handle VJ
+    let mut forbidden_vj_idx = HashSet::new();
+    let mut allowed_vj_idx = HashSet::new();
+
+    let mut forbidden_line_idx: IdxSet<Line> = IdxSet::new();
+    let mut allowed_line_idx: IdxSet<Line> = IdxSet::new();
+    let mut forbidden_route_idx: IdxSet<Line> = IdxSet::new();
+    let mut allowed_route_idx: IdxSet<Line> = IdxSet::new();
+    let mut forbidden_network_idx: IdxSet<Line> = IdxSet::new();
+    let mut allowed_network_idx: IdxSet<Line> = IdxSet::new();
+
+    for s in forbidden_uri {
+        let out = parse_filter(s.as_str());
+        match out {
+            Some(FilterType::Line(line)) => {
+                let line_idx = model.lines.get_idx(line);
+                if let Some(idx) = line_idx {
+                    forbidden_line_idx.insert(idx);
+                }
+            }
+            _ => (),
+        }
     }
 
-    //Handle VJ
+    let vj_into_forbidden_line: IdxSet<VehicleJourney> =
+        forbidden_line_idx.get_corresponding(model);
+    forbidden_vj_idx.extend(vj_into_forbidden_line);
+    let vj_into_allowed_line: IdxSet<VehicleJourney> = allowed_line_idx.get_corresponding(model);
+    allowed_vj_idx.extend(vj_into_allowed_line);
 
-    (forbidden_sp_idx, allowed_sp_idx)
+    let vj_into_forbidden_route: IdxSet<VehicleJourney> =
+        forbidden_route_idx.get_corresponding(model);
+    forbidden_vj_idx.extend(vj_into_forbidden_route);
+    let vj_into_allowed_route: IdxSet<VehicleJourney> = allowed_route_idx.get_corresponding(model);
+    allowed_vj_idx.extend(vj_into_allowed_route);
+
+    let vj_into_forbidden_network: IdxSet<VehicleJourney> =
+        forbidden_network_idx.get_corresponding(model);
+    forbidden_vj_idx.extend(vj_into_forbidden_network);
+    let vj_into_allowed_network: IdxSet<VehicleJourney> =
+        allowed_network_idx.get_corresponding(model);
+    allowed_vj_idx.extend(vj_into_allowed_network);
+
+    Filters {
+        forbidden_sp_idx,
+        allowed_sp_idx,
+        forbidden_vj_idx,
+        allowed_vj_idx,
+    }
 }

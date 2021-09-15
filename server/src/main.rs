@@ -405,7 +405,7 @@ where
         config.request_default_params.max_nb_of_legs
     });
 
-    let (forbidden_sp_idx, allowed_sp_idx) = create_filter_idx(
+    let filters = create_filter_idx(
         model,
         &journey_request.forbidden_uris,
         &journey_request.allowed_id,
@@ -419,8 +419,10 @@ where
         max_nb_of_legs,
         max_journey_duration,
         too_late_threshold: config.request_default_params.too_late_threshold,
-        forbidden_sp_idx,
-        allowed_sp_idx,
+        forbidden_sp_idx: filters.forbidden_sp_idx,
+        allowed_sp_idx: filters.allowed_sp_idx,
+        forbidden_vj_idx: filters.forbidden_vj_idx,
+        allowed_vj_idx: filters.allowed_vj_idx,
     };
 
     let datetime_represent = match journey_request.clockwise {

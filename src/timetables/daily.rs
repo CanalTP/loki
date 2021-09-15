@@ -39,41 +39,46 @@ use super::{
     iters::{PositionsIter, TimetableIter, VehicleIter},
     FlowDirection, Stop, TimetablesIter,
 };
-
-use crate::transit_data::{Idx, VehicleJourney};
+use crate::loads_data::Load;
+use crate::log::{trace, warn};
 use crate::{
     loads_data::LoadsData,
     time::{
         Calendar, DaysSinceDatasetStart, SecondsSinceDatasetUTCStart, SecondsSinceTimezonedDayStart,
     },
+    timetables::{
+        generic_timetables::VehicleDataTrait, Timetables as TimetablesTrait,
+        Types as TimetablesTypes,
+    },
+    transit_data::{Idx, VehicleJourney},
 };
 use chrono::NaiveDate;
-
-use crate::timetables::{Timetables as TimetablesTrait, Types as TimetablesTypes};
-
-use crate::log::{trace, warn};
-
-use crate::loads_data::Load;
 use core::cmp;
-
 pub type Time = SecondsSinceDatasetUTCStart;
+
 #[derive(Debug)]
 pub struct DailyTimetables {
     timetables: Timetables<Time, Load, (), VehicleData>,
     calendar: Calendar,
 }
+
 #[derive(Clone, Debug)]
-struct VehicleData {
+pub struct VehicleData {
     vehicle_journey_idx: Idx<VehicleJourney>,
     day: DaysSinceDatasetStart,
 }
 
+impl VehicleDataTrait for VehicleData {
+    fn get_vehicle_journey_idx(&self) -> Idx<VehicleJourney> {
+        self.vehicle_journey_idx
+    }
+}
+
 impl TimetablesTypes for DailyTimetables {
     type Mission = Timetable;
-
     type Position = Position;
-
     type Trip = Vehicle;
+    type VehicleData = VehicleData;
 }
 
 impl TimetablesTrait for DailyTimetables {
@@ -174,8 +179,26 @@ impl TimetablesTrait for DailyTimetables {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, Time, Load)> {
+        self.earliest_filtered_trip_to_board_at(
+            waiting_time,
+            mission,
+            position,
+            |_: &VehicleData| true,
+        )
+    }
+
+    fn earliest_filtered_trip_to_board_at<Filter>(
+        &self,
+        waiting_time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, Time, Load)>
+    where
+        Filter: Fn(&VehicleData) -> bool,
+    {
         self.timetables
-            .earliest_vehicle_to_board(waiting_time, mission, position)
+            .earliest_filtered_vehicle_to_board(waiting_time, mission, position, filter)
             .map(|(trip, time, load)| (trip, *time, *load))
     }
 

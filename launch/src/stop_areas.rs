@@ -62,6 +62,8 @@ pub fn make_query_stop_areas(
         too_late_threshold: request_params.too_late_threshold,
         forbidden_sp_idx: HashSet::new(),
         allowed_sp_idx: HashSet::new(),
+        forbidden_vj_idx: HashSet::new(),
+        allowed_vj_idx: HashSet::new(),
     };
 
     Ok(request_input)

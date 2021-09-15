@@ -50,6 +50,7 @@ use crate::{
 
 use std::{collections::HashMap, fmt::Debug};
 
+use super::timetables::generic_timetables::VehicleDataTrait;
 use crate::timetables::{Timetables as TimetablesTrait, TimetablesIter};
 
 pub struct TransitData<Timetables: TimetablesTrait> {
@@ -60,6 +61,7 @@ pub struct TransitData<Timetables: TimetablesTrait> {
 
     pub(super) transfers_data: Vec<TransferData>,
 }
+
 pub struct StopData<Timetables: TimetablesTrait> {
     pub(super) stop_point_idx: Idx<StopPoint>,
     pub(super) position_in_timetables: Vec<(Timetables::Mission, Timetables::Position)>,
@@ -102,14 +104,11 @@ impl<Timetables: TimetablesTrait> TransitData<Timetables> {
 
 impl<Timetables: TimetablesTrait> data_interface::TransitTypes for TransitData<Timetables> {
     type Stop = Stop;
-
     type Mission = Timetables::Mission;
-
     type Position = Timetables::Position;
-
     type Trip = Timetables::Trip;
-
     type Transfer = Transfer;
+    type VehicleData = Timetables::VehicleData;
 }
 
 impl<Timetables: TimetablesTrait> data_interface::Data for TransitData<Timetables>
@@ -205,6 +204,20 @@ where
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)> {
         self.timetables
             .earliest_trip_to_board_at(waiting_time, mission, position)
+    }
+
+    fn earliest_filtered_trip_to_board_at<Filter>(
+        &self,
+        waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&Timetables::VehicleData) -> bool,
+    {
+        self.timetables
+            .earliest_filtered_trip_to_board_at(waiting_time, mission, position, filter)
     }
 
     fn latest_trip_that_debark_at(

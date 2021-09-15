@@ -35,7 +35,7 @@
 // www.navitia.io
 
 mod daily;
-mod generic_timetables;
+pub(crate) mod generic_timetables;
 mod iters;
 mod periodic;
 mod periodic_split_vj_by_tz;
@@ -55,6 +55,7 @@ use crate::{
 
 use chrono::NaiveDate;
 
+use crate::timetables::generic_timetables::VehicleDataTrait;
 use std::fmt::Debug;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
@@ -70,6 +71,7 @@ pub trait Types {
     type Mission: Debug + Clone + Hash + Eq;
     type Position: Debug + Clone;
     type Trip: Debug + Clone;
+    type VehicleData: Debug + Clone + VehicleDataTrait;
 }
 
 pub trait Timetables: Types {
@@ -138,6 +140,16 @@ pub trait Timetables: Types {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>;
+
+    fn earliest_filtered_trip_to_board_at<Filter>(
+        &self,
+        waiting_time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&Self::VehicleData) -> bool;
 
     fn latest_trip_that_debark_at(
         &self,

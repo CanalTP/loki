@@ -243,6 +243,8 @@ pub struct RequestInput {
     pub too_late_threshold: PositiveDuration,
     pub forbidden_sp_idx: HashSet<Idx<StopPoint>>,
     pub allowed_sp_idx: HashSet<Idx<StopPoint>>,
+    pub forbidden_vj_idx: HashSet<Idx<VehicleJourney>>,
+    pub allowed_vj_idx: HashSet<Idx<VehicleJourney>>,
 }
 
 pub trait RequestIO<'data, 'model, Data: data_interface::Data>: Request {
@@ -318,6 +320,7 @@ use chrono::NaiveDateTime;
 
 use crate::PositiveDuration;
 use std::collections::HashSet;
+use transit_model::objects::VehicleJourney;
 
 impl fmt::Display for BadRequest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

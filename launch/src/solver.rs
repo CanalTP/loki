@@ -74,8 +74,10 @@ impl<Data: DataTrait> Solver<Data> {
         use crate::datetime::DateTimeRepresent::*;
         use config::ComparatorType::*;
 
-        let filtered_request =
-            request_input.forbidden_sp_idx.is_empty() && request_input.allowed_sp_idx.is_empty();
+        let filtered_request = request_input.forbidden_sp_idx.is_empty()
+            && request_input.allowed_sp_idx.is_empty()
+            && request_input.forbidden_vj_idx.is_empty()
+            && request_input.allowed_vj_idx.is_empty();
 
         let responses = match (datetime_represent, comparator_type, filtered_request) {
             (Arrival, Loads, true) => {

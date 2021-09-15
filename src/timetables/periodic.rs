@@ -42,7 +42,10 @@ use super::{
     Stop, TimetablesIter,
 };
 
-use crate::timetables::{FlowDirection, Timetables as TimetablesTrait, Types as TimetablesTypes};
+use crate::timetables::{
+    generic_timetables::VehicleDataTrait, FlowDirection, Timetables as TimetablesTrait,
+    Types as TimetablesTypes,
+};
 use crate::transit_data::{Idx, VehicleJourney};
 use crate::{
     loads_data::LoadsData,
@@ -69,9 +72,15 @@ pub struct PeriodicTimetables {
 }
 
 #[derive(Debug, Clone)]
-struct VehicleData {
+pub struct VehicleData {
     days_pattern: DaysPattern,
     vehicle_journey_idx: Idx<VehicleJourney>,
+}
+
+impl VehicleDataTrait for VehicleData {
+    fn get_vehicle_journey_idx(&self) -> Idx<VehicleJourney> {
+        self.vehicle_journey_idx
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -82,10 +91,9 @@ pub struct Trip {
 
 impl TimetablesTypes for PeriodicTimetables {
     type Mission = Timetable;
-
     type Position = Position;
-
     type Trip = Trip;
+    type VehicleData = VehicleData;
 }
 
 impl TimetablesTrait for PeriodicTimetables {
@@ -224,6 +232,24 @@ impl TimetablesTrait for PeriodicTimetables {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)> {
+        self.earliest_filtered_trip_to_board_at(
+            waiting_time,
+            mission,
+            position,
+            |_: &VehicleData| true,
+        )
+    }
+
+    fn earliest_filtered_trip_to_board_at<Filter>(
+        &self,
+        waiting_time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&VehicleData) -> bool,
+    {
         let has_earliest_and_latest_board_time =
             self.timetables.earliest_and_latest_board_time(position);
 
@@ -255,7 +281,8 @@ impl TimetablesTrait for PeriodicTimetables {
                 position,
                 |vehicle_data| {
                     let days_pattern = vehicle_data.days_pattern;
-                    self.days_patterns.is_allowed(&days_pattern, &waiting_day)
+                    filter(vehicle_data)
+                        && self.days_patterns.is_allowed(&days_pattern, &waiting_day)
                 },
             );
             if let Some((vehicle, arrival_time_in_day_at_next_stop, load)) = has_vehicle {

@@ -41,7 +41,7 @@ use crate::{
     loads_data::LoadsCount,
     time::{PositiveDuration, SecondsSinceDatasetUTCStart},
     transit_data::data_interface::DataIters,
-    Idx, StopPoint,
+    Idx, StopPoint, VehicleJourney,
 };
 
 use crate::engine::engine_interface::{BadRequest, RequestTypes};
@@ -54,6 +54,7 @@ use crate::engine::engine_interface::Journey as PTJourney;
 use crate::request::generic_request::MaximizeDepartureTimeError;
 use crate::request::generic_request::MaximizeDepartureTimeError::{NoBoardTime, NoTrip};
 use crate::response;
+use crate::timetables::generic_timetables::{Vehicle, VehicleDataTrait};
 use std::collections::HashSet;
 
 pub struct GenericDepartAfterRequestFiltered<'data, 'model, Data: DataTrait> {
@@ -69,6 +70,8 @@ pub struct GenericDepartAfterRequestFiltered<'data, 'model, Data: DataTrait> {
     pub(super) too_late_threshold: PositiveDuration,
     pub(super) forbidden_sp_idx: HashSet<Idx<StopPoint>>,
     pub(super) allowed_sp_idx: HashSet<Idx<StopPoint>>,
+    pub(super) forbidden_vj_idx: HashSet<Idx<VehicleJourney>>,
+    pub(super) allowed_vj_idx: HashSet<Idx<VehicleJourney>>,
 }
 
 impl<'data, 'model, Data> GenericDepartAfterRequestFiltered<'data, 'model, Data>
@@ -129,6 +132,8 @@ where
             too_late_threshold: request_input.too_late_threshold,
             forbidden_sp_idx: request_input.forbidden_sp_idx.clone(),
             allowed_sp_idx: request_input.allowed_sp_idx.clone(),
+            forbidden_vj_idx: request_input.forbidden_vj_idx.clone(),
+            allowed_vj_idx: request_input.allowed_vj_idx.clone(),
         };
 
         Ok(result)
@@ -259,8 +264,17 @@ where
         waiting_criteria: &Criteria,
     ) -> Option<(Data::Trip, Criteria)> {
         let waiting_time = &waiting_criteria.time;
+
         self.transit_data
-            .earliest_trip_to_board_at(waiting_time, mission, position)
+            .earliest_filtered_trip_to_board_at(
+                waiting_time,
+                mission,
+                position,
+                |vehicle_data: &Data::VehicleData| {
+                    let idx = vehicle_data.get_vehicle_journey_idx();
+                    !self.forbidden_vj_idx.contains(&idx)
+                },
+            )
             .map(|(trip, arrival_time, load)| {
                 let new_criteria = Criteria {
                     time: arrival_time,

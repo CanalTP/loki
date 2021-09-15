@@ -65,9 +65,15 @@ pub struct PeriodicSplitVjByTzTimetables {
 }
 
 #[derive(Debug, Clone)]
-struct VehicleData {
+pub struct VehicleData {
     days_pattern: DaysPattern,
     vehicle_journey_idx: Idx<VehicleJourney>,
+}
+
+impl VehicleDataTrait for VehicleData {
+    fn get_vehicle_journey_idx(&self) -> Idx<VehicleJourney> {
+        self.vehicle_journey_idx
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,10 +84,9 @@ pub struct Trip {
 
 impl TimetablesTypes for PeriodicSplitVjByTzTimetables {
     type Mission = Timetable;
-
     type Position = Position;
-
     type Trip = Trip;
+    type VehicleData = VehicleData;
 }
 
 impl TimetablesTrait for PeriodicSplitVjByTzTimetables {
@@ -211,6 +216,24 @@ impl TimetablesTrait for PeriodicSplitVjByTzTimetables {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)> {
+        self.earliest_filtered_trip_to_board_at(
+            waiting_time,
+            mission,
+            position,
+            |_: &VehicleData| true,
+        )
+    }
+
+    fn earliest_filtered_trip_to_board_at<Filter>(
+        &self,
+        waiting_time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&VehicleData) -> bool,
+    {
         let has_earliest_and_latest_board_time =
             self.timetables.earliest_and_latest_board_time(position);
 
@@ -239,7 +262,8 @@ impl TimetablesTrait for PeriodicSplitVjByTzTimetables {
                 position,
                 |vehicle_data| {
                     let days_pattern = vehicle_data.days_pattern;
-                    self.days_patterns.is_allowed(&days_pattern, &waiting_day)
+                    filter(vehicle_data)
+                        && self.days_patterns.is_allowed(&days_pattern, &waiting_day)
                 },
             );
             if let Some((vehicle, arrival_time_in_day_at_next_stop, load)) = has_vehicle {
@@ -420,7 +444,7 @@ impl TimetablesTrait for PeriodicSplitVjByTzTimetables {
 }
 
 use super::generic_timetables::VehicleTimesError;
-use crate::timetables::generic_timetables::{Position, Timetable};
+use crate::timetables::generic_timetables::{Position, Timetable, VehicleDataTrait};
 use core::cmp;
 use std::collections::BTreeMap;
 
