@@ -177,6 +177,31 @@ pub fn create_filter_idx(
         }
     }
 
+    for s in allowed_uri {
+        let out = parse_filter(s.as_str());
+        match out {
+            Some(FilterType::Line(line)) => {
+                let line_idx = model.lines.get_idx(line);
+                if let Some(idx) = line_idx {
+                    allowed_line_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Route(route)) => {
+                let route_idx = model.routes.get_idx(route);
+                if let Some(idx) = route_idx {
+                    allowed_route_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Network(network)) => {
+                let network_idx = model.networks.get_idx(network);
+                if let Some(idx) = network_idx {
+                    allowed_network_idx.insert(idx);
+                }
+            }
+            _ => (),
+        }
+    }
+
     let vj_into_forbidden_line: IdxSet<VehicleJourney> =
         forbidden_line_idx.get_corresponding(model);
     forbidden_vj_idx.extend(vj_into_forbidden_line);

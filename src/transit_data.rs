@@ -50,7 +50,6 @@ use crate::{
 
 use std::{collections::HashMap, fmt::Debug};
 
-use super::timetables::generic_timetables::VehicleDataTrait;
 use crate::timetables::{Timetables as TimetablesTrait, TimetablesIter};
 
 pub struct TransitData<Timetables: TimetablesTrait> {

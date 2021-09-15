@@ -54,7 +54,7 @@ use crate::engine::engine_interface::Journey as PTJourney;
 use crate::request::generic_request::MaximizeDepartureTimeError;
 use crate::request::generic_request::MaximizeDepartureTimeError::{NoBoardTime, NoTrip};
 use crate::response;
-use crate::timetables::generic_timetables::{Vehicle, VehicleDataTrait};
+use crate::timetables::generic_timetables::VehicleDataTrait;
 use std::collections::HashSet;
 
 pub struct GenericDepartAfterRequestFiltered<'data, 'model, Data: DataTrait> {
@@ -271,8 +271,13 @@ where
                 mission,
                 position,
                 |vehicle_data: &Data::VehicleData| {
-                    let idx = vehicle_data.get_vehicle_journey_idx();
-                    !self.forbidden_vj_idx.contains(&idx)
+                    let vj_idx = vehicle_data.get_vehicle_journey_idx();
+                    if let true = self.allowed_vj_idx.is_empty() {
+                        return !self.forbidden_vj_idx.contains(&vj_idx);
+                    } else {
+                        return self.allowed_vj_idx.contains(&vj_idx)
+                            && !self.forbidden_vj_idx.contains(&vj_idx);
+                    }
                 },
             )
             .map(|(trip, arrival_time, load)| {

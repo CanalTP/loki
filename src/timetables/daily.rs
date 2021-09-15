@@ -179,12 +179,9 @@ impl TimetablesTrait for DailyTimetables {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, Time, Load)> {
-        self.earliest_filtered_trip_to_board_at(
-            waiting_time,
-            mission,
-            position,
-            |_: &VehicleData| true,
-        )
+        self.timetables
+            .earliest_vehicle_to_board(waiting_time, mission, position)
+            .map(|(trip, time, load)| (trip, *time, *load))
     }
 
     fn earliest_filtered_trip_to_board_at<Filter>(
