@@ -460,7 +460,7 @@ where
         &'outer self,
         from_stop: &Data::Stop,
         criteria: &Criteria,
-    ) -> TransferAtStop<'data, 'outer, Data> {
+    ) -> TransferAtStop<'data, 'model, 'outer, Data> {
         let outgoing_transfers = self.transit_data.outgoing_transfers_at(from_stop);
         TransferAtStop {
             from_stop: from_stop.clone(),
@@ -477,19 +477,19 @@ where
     }
 }
 
-pub struct TransferAtStop<'data, 'outer, Data>
+pub struct TransferAtStop<'data, 'model, 'outer, Data>
 where
     Data: DataTrait + DataIters<'outer>,
 {
     from_stop: Data::Stop,
-    model: &'outer Model,
+    model: &'model Model,
     data: &'data Data,
     forbidden: &'outer HashSet<Idx<StopPoint>>,
     inner: Data::OutgoingTransfersAtStop,
     criteria: Criteria,
 }
 
-impl<'data, 'outer, Data> Iterator for TransferAtStop<'data, 'outer, Data>
+impl<'data, 'model, 'outer, Data> Iterator for TransferAtStop<'data, 'model, 'outer, Data>
 where
     Data: DataTrait + DataIters<'outer>,
 {

@@ -200,7 +200,7 @@ where
         self.generic.boardable_missions_at(stop)
     }
 
-    type TransfersAtStop = super::TransferAtStop<'data, 'outer, Data>;
+    type TransfersAtStop = super::TransferAtStop<'data, 'model, 'outer, Data>;
     fn transfers_at(
         &'outer self,
         from_stop: &Self::Stop,
