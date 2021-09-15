@@ -92,14 +92,28 @@ where
             &request_input.departures_stop_point_and_fallback_duration,
             model,
             transit_data,
-            |sp_idx| !request_input.forbidden_sp_idx.contains(&sp_idx),
+            |sp_idx| {
+                if let true = request_input.allowed_sp_idx.is_empty() {
+                    return !request_input.forbidden_sp_idx.contains(&sp_idx);
+                } else {
+                    return request_input.allowed_sp_idx.contains(&sp_idx)
+                        && !request_input.forbidden_sp_idx.contains(&sp_idx);
+                }
+            },
         )?;
 
         let arrivals: Vec<_> = super::generic_request::parse_arrivals_filtered(
             &request_input.arrivals_stop_point_and_fallback_duration,
             model,
             transit_data,
-            |sp_idx| !request_input.forbidden_sp_idx.contains(&sp_idx),
+            |sp_idx| {
+                if let true = request_input.allowed_sp_idx.is_empty() {
+                    return !request_input.forbidden_sp_idx.contains(&sp_idx);
+                } else {
+                    return request_input.allowed_sp_idx.contains(&sp_idx)
+                        && !request_input.forbidden_sp_idx.contains(&sp_idx);
+                }
+            },
         )?;
 
         let result = Self {
@@ -497,15 +511,23 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let forbidden = self.forbidden;
+        let allowed = self.allowed;
         let from_stop = &self.from_stop;
         let data = self.data;
 
         self.inner
             .by_ref()
-            .filter(|(stop, _, _)| {
+            .filter(|(to_stop, _, _)| {
                 let from_sp_idx = data.stop_point_idx(from_stop);
-                let to_sp_idx = data.stop_point_idx(stop);
-                !(forbidden.contains(&from_sp_idx) || forbidden.contains(&to_sp_idx))
+                let to_sp_idx = data.stop_point_idx(to_stop);
+                if let true = allowed.is_empty() {
+                    return !forbidden.contains(&from_sp_idx) && !forbidden.contains(&to_sp_idx);
+                } else {
+                    return allowed.contains(&from_sp_idx)
+                        && allowed.contains(&to_sp_idx)
+                        && !forbidden.contains(&from_sp_idx)
+                        && !forbidden.contains(&to_sp_idx);
+                }
             })
             .next()
             .map(|(stop, durations, transfer)| {
