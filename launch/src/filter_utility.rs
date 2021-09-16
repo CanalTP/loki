@@ -35,6 +35,7 @@
 // www.navitia.io
 
 use crate::loki::Idx;
+use loki::transit_model::objects::{CommercialMode, PhysicalMode};
 use loki::transit_model::{
     model::GetCorresponding,
     objects::{Line, Network, Route, StopArea, StopPoint, VehicleJourney},
@@ -91,135 +92,8 @@ pub fn create_filter_idx(
     forbidden_uri: &[String],
     allowed_uri: &[String],
 ) -> Filters {
-    let mut forbidden_sp_idx = HashSet::new();
-    let mut allowed_sp_idx = HashSet::new();
-
-    let mut forbidden_sa_idx: IdxSet<StopArea> = IdxSet::new();
-    let mut allowed_sa_idx: IdxSet<StopArea> = IdxSet::new();
-
-    // Handle Stop points and stop areas
-    for s in forbidden_uri {
-        let out = parse_filter(s.as_str());
-        match out {
-            Some(FilterType::StopPoint(sp)) => {
-                let sp_idx = model.stop_points.get_idx(sp);
-                if let Some(idx) = sp_idx {
-                    forbidden_sp_idx.insert(idx);
-                }
-            }
-            Some(FilterType::StopArea(sa_uri)) => {
-                let opt_idx = model.stop_areas.get_idx(sa_uri);
-                if let Some(idx) = opt_idx {
-                    forbidden_sa_idx.insert(idx);
-                }
-            }
-            _ => (),
-        }
-    }
-    let sp_into_forbidden_sa: IdxSet<StopPoint> = forbidden_sa_idx.get_corresponding(model);
-    forbidden_sp_idx.extend(sp_into_forbidden_sa);
-
-    for s in allowed_uri {
-        let out = parse_filter(s.as_str());
-        match out {
-            Some(FilterType::StopPoint(sp)) => {
-                let sp_idx = model.stop_points.get_idx(sp);
-                if let Some(idx) = sp_idx {
-                    allowed_sp_idx.insert(idx);
-                }
-            }
-            Some(FilterType::StopArea(sa_uri)) => {
-                let opt_idx = model.stop_areas.get_idx(sa_uri);
-                if let Some(idx) = opt_idx {
-                    allowed_sa_idx.insert(idx);
-                }
-            }
-            _ => (),
-        }
-    }
-
-    let sp_into_allowed_sa: IdxSet<StopPoint> = allowed_sa_idx.get_corresponding(model);
-    allowed_sp_idx.extend(sp_into_allowed_sa);
-
-    //Handle VJ
-    let mut forbidden_vj_idx = HashSet::new();
-    let mut allowed_vj_idx = HashSet::new();
-
-    let mut forbidden_line_idx: IdxSet<Line> = IdxSet::new();
-    let mut allowed_line_idx: IdxSet<Line> = IdxSet::new();
-    let mut forbidden_route_idx: IdxSet<Route> = IdxSet::new();
-    let mut allowed_route_idx: IdxSet<Route> = IdxSet::new();
-    let mut forbidden_network_idx: IdxSet<Network> = IdxSet::new();
-    let mut allowed_network_idx: IdxSet<Network> = IdxSet::new();
-
-    for s in forbidden_uri {
-        let out = parse_filter(s.as_str());
-        match out {
-            Some(FilterType::Line(line)) => {
-                let line_idx = model.lines.get_idx(line);
-                if let Some(idx) = line_idx {
-                    forbidden_line_idx.insert(idx);
-                }
-            }
-            Some(FilterType::Route(route)) => {
-                let route_idx = model.routes.get_idx(route);
-                if let Some(idx) = route_idx {
-                    forbidden_route_idx.insert(idx);
-                }
-            }
-            Some(FilterType::Network(network)) => {
-                let network_idx = model.networks.get_idx(network);
-                if let Some(idx) = network_idx {
-                    forbidden_network_idx.insert(idx);
-                }
-            }
-            _ => (),
-        }
-    }
-
-    for s in allowed_uri {
-        let out = parse_filter(s.as_str());
-        match out {
-            Some(FilterType::Line(line)) => {
-                let line_idx = model.lines.get_idx(line);
-                if let Some(idx) = line_idx {
-                    allowed_line_idx.insert(idx);
-                }
-            }
-            Some(FilterType::Route(route)) => {
-                let route_idx = model.routes.get_idx(route);
-                if let Some(idx) = route_idx {
-                    allowed_route_idx.insert(idx);
-                }
-            }
-            Some(FilterType::Network(network)) => {
-                let network_idx = model.networks.get_idx(network);
-                if let Some(idx) = network_idx {
-                    allowed_network_idx.insert(idx);
-                }
-            }
-            _ => (),
-        }
-    }
-
-    let vj_into_forbidden_line: IdxSet<VehicleJourney> =
-        forbidden_line_idx.get_corresponding(model);
-    forbidden_vj_idx.extend(vj_into_forbidden_line);
-    let vj_into_allowed_line: IdxSet<VehicleJourney> = allowed_line_idx.get_corresponding(model);
-    allowed_vj_idx.extend(vj_into_allowed_line);
-
-    let vj_into_forbidden_route: IdxSet<VehicleJourney> =
-        forbidden_route_idx.get_corresponding(model);
-    forbidden_vj_idx.extend(vj_into_forbidden_route);
-    let vj_into_allowed_route: IdxSet<VehicleJourney> = allowed_route_idx.get_corresponding(model);
-    allowed_vj_idx.extend(vj_into_allowed_route);
-
-    let vj_into_forbidden_network: IdxSet<VehicleJourney> =
-        forbidden_network_idx.get_corresponding(model);
-    forbidden_vj_idx.extend(vj_into_forbidden_network);
-    let vj_into_allowed_network: IdxSet<VehicleJourney> =
-        allowed_network_idx.get_corresponding(model);
-    allowed_vj_idx.extend(vj_into_allowed_network);
+    let (forbidden_sp_idx, forbidden_vj_idx) = parse_uri(model, forbidden_uri);
+    let (allowed_sp_idx, allowed_vj_idx) = parse_uri(model, allowed_uri);
 
     Filters {
         forbidden_sp_idx,
@@ -227,4 +101,99 @@ pub fn create_filter_idx(
         forbidden_vj_idx,
         allowed_vj_idx,
     }
+}
+
+fn pt_object_to_vj<T>(
+    model: &Model,
+    pt_index_set: &IdxSet<T>,
+    vj_index_set: &mut HashSet<Idx<VehicleJourney>>,
+) where
+    IdxSet<T>: GetCorresponding<VehicleJourney>,
+{
+    let vj_set: IdxSet<VehicleJourney> = pt_index_set.get_corresponding(model);
+    vj_index_set.extend(vj_set);
+}
+
+fn pt_object_to_sp<T>(
+    model: &Model,
+    pt_index_set: &IdxSet<T>,
+    sp_index_set: &mut HashSet<Idx<StopPoint>>,
+) where
+    IdxSet<T>: GetCorresponding<StopPoint>,
+{
+    let sp_set: IdxSet<StopPoint> = pt_index_set.get_corresponding(model);
+    sp_index_set.extend(sp_set);
+}
+
+fn parse_uri(
+    model: &Model,
+    uris: &[String],
+) -> (HashSet<Idx<StopPoint>>, HashSet<Idx<VehicleJourney>>) {
+    let mut set_sp_idx = HashSet::new();
+    let mut set_vj_idx = HashSet::new();
+
+    let mut set_sa_idx: IdxSet<StopArea> = IdxSet::new();
+    let mut set_line_idx: IdxSet<Line> = IdxSet::new();
+    let mut set_route_idx: IdxSet<Route> = IdxSet::new();
+    let mut set_network_idx: IdxSet<Network> = IdxSet::new();
+    let mut set_physical_mode_idx: IdxSet<PhysicalMode> = IdxSet::new();
+    let mut set_commercial_mode_idx: IdxSet<CommercialMode> = IdxSet::new();
+
+    for str in uris {
+        let parsed_str = parse_filter(str.as_str());
+        match parsed_str {
+            Some(FilterType::StopPoint(sp)) => {
+                let sp_idx = model.stop_points.get_idx(sp);
+                if let Some(idx) = sp_idx {
+                    set_sp_idx.insert(idx);
+                }
+            }
+            Some(FilterType::StopArea(sa_uri)) => {
+                let opt_idx = model.stop_areas.get_idx(sa_uri);
+                if let Some(idx) = opt_idx {
+                    set_sa_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Line(line)) => {
+                let line_idx = model.lines.get_idx(line);
+                if let Some(idx) = line_idx {
+                    set_line_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Route(route)) => {
+                let route_idx = model.routes.get_idx(route);
+                if let Some(idx) = route_idx {
+                    set_route_idx.insert(idx);
+                }
+            }
+            Some(FilterType::Network(network)) => {
+                let network_idx = model.networks.get_idx(network);
+                if let Some(idx) = network_idx {
+                    set_network_idx.insert(idx);
+                }
+            }
+            Some(FilterType::PhysicalMode(physical_mode)) => {
+                let physical_mode_idx = model.physical_modes.get_idx(physical_mode);
+                if let Some(idx) = physical_mode_idx {
+                    set_physical_mode_idx.insert(idx);
+                }
+            }
+            Some(FilterType::CommercialMode(commercial_mode)) => {
+                let commercial_mode_idx = model.commercial_modes.get_idx(commercial_mode);
+                if let Some(idx) = commercial_mode_idx {
+                    set_commercial_mode_idx.insert(idx);
+                }
+            }
+            _ => (),
+        }
+    }
+
+    pt_object_to_sp(model, &set_sa_idx, &mut set_sp_idx);
+    pt_object_to_vj(model, &set_line_idx, &mut set_vj_idx);
+    pt_object_to_vj(model, &set_route_idx, &mut set_vj_idx);
+    pt_object_to_vj(model, &set_network_idx, &mut set_vj_idx);
+    pt_object_to_vj(model, &set_physical_mode_idx, &mut set_vj_idx);
+    pt_object_to_vj(model, &set_commercial_mode_idx, &mut set_vj_idx);
+
+    (set_sp_idx, set_vj_idx)
 }
