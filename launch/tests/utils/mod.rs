@@ -66,7 +66,7 @@ pub fn init_logger() {
     .try_init();
 }
 
-pub struct Config {
+pub struct Config<'a> {
     pub request_params: config::RequestParams,
 
     pub datetime: NaiveDateTime,
@@ -86,13 +86,13 @@ pub struct Config {
     pub end: String,
 
     // Allowed_uri
-    pub allowed_uri: Vec<String>,
+    pub allowed_uri: Vec<&'a str>,
 
     // Forbidden_uri
-    pub forbidden_uri: Vec<String>,
+    pub forbidden_uri: Vec<&'a str>,
 }
 
-impl Config {
+impl<'a> Config<'a> {
     pub fn new(datetime: impl AsDateTime, start: &str, end: &str) -> Self {
         Self::new_timezoned(datetime, &model_builder::DEFAULT_TIMEZONE, start, end)
     }
@@ -127,7 +127,7 @@ fn make_request_from_config(model: &Model, config: &Config) -> Result<RequestInp
     let start_stop_point_uri = &config.start;
     let end_stop_point_uri = &config.end;
 
-    let filters = create_filter_idx(model, &config.forbidden_uri, &config.forbidden_uri);
+    let filters = create_filter_idx(model, &config.forbidden_uri, &config.allowed_uri);
 
     let request_input = RequestInput {
         datetime,

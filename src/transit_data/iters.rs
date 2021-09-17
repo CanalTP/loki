@@ -60,12 +60,12 @@ impl<Timetables: TimetablesTrait> TransitData<Timetables> {
         Filter: Fn(&Stop) -> bool,
     {
         if let true = filter(stop) {
-            MissionsOfStop { inner: [].iter() }
-        } else {
             let stop_data = self.stop_data(stop);
             MissionsOfStop {
                 inner: stop_data.position_in_timetables.iter(),
             }
+        } else {
+            MissionsOfStop { inner: [].iter() }
         }
     }
 

@@ -60,35 +60,35 @@ pub struct Filters {
     pub allowed_vj_idx: IdxSet<VehicleJourney>,
 }
 
-fn parse_filter(input: &str) -> Option<FilterType> {
-    if let Some(stop_point) = input.strip_prefix("stop_point:") {
+fn parse_filter<T: AsRef<str>>(input: &T) -> Option<FilterType> {
+    if let Some(stop_point) = input.as_ref().strip_prefix("stop_point:") {
         return Some(FilterType::StopPoint(stop_point));
     }
-    if let Some(stop_area) = input.strip_prefix("stop_area:") {
+    if let Some(stop_area) = input.as_ref().strip_prefix("stop_area:") {
         return Some(FilterType::StopArea(stop_area));
     }
-    if let Some(line) = input.strip_prefix("line:") {
+    if let Some(line) = input.as_ref().strip_prefix("line:") {
         return Some(FilterType::Line(line));
     }
-    if let Some(route) = input.strip_prefix("route:") {
+    if let Some(route) = input.as_ref().strip_prefix("route:") {
         return Some(FilterType::Route(route));
     }
-    if let Some(network) = input.strip_prefix("network:") {
+    if let Some(network) = input.as_ref().strip_prefix("network:") {
         return Some(FilterType::Network(network));
     }
-    if let Some(physical_mode) = input.strip_prefix("physical_mode:") {
+    if let Some(physical_mode) = input.as_ref().strip_prefix("physical_mode:") {
         return Some(FilterType::PhysicalMode(physical_mode));
     }
-    if let Some(commercial_mode) = input.strip_prefix("commercial_mode:") {
+    if let Some(commercial_mode) = input.as_ref().strip_prefix("commercial_mode:") {
         return Some(FilterType::CommercialMode(commercial_mode));
     }
     None
 }
 
-pub fn create_filter_idx(
+pub fn create_filter_idx<T: AsRef<str>>(
     model: &Model,
-    forbidden_uri: &[String],
-    allowed_uri: &[String],
+    forbidden_uri: &[T],
+    allowed_uri: &[T],
 ) -> Filters {
     let (forbidden_sp_idx, forbidden_vj_idx) = parse_uri(model, forbidden_uri);
     let (allowed_sp_idx, allowed_vj_idx) = parse_uri(model, allowed_uri);
@@ -120,12 +120,15 @@ where
     sp_index_set.extend(sp_set);
 }
 
-fn parse_uri(model: &Model, uris: &[String]) -> (IdxSet<StopPoint>, IdxSet<VehicleJourney>) {
+fn parse_uri<T: AsRef<str>>(
+    model: &Model,
+    uris: &[T],
+) -> (IdxSet<StopPoint>, IdxSet<VehicleJourney>) {
     let mut set_sp_idx: IdxSet<StopPoint> = IdxSet::new();
     let mut set_vj_idx: IdxSet<VehicleJourney> = IdxSet::new();
 
     for str in uris {
-        let parsed_str = parse_filter(str.as_str());
+        let parsed_str = parse_filter(str);
         match parsed_str {
             Some(FilterType::StopPoint(sp)) => {
                 let sp_idx = model.stop_points.get_idx(sp);
