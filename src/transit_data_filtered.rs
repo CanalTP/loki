@@ -148,7 +148,20 @@ where
         trip: &Self::Trip,
         position: &Self::Position,
     ) -> Option<(SecondsSinceDatasetUTCStart, Load)> {
-        self.transit_data.timetables.board_time_of(trip, position)
+        let mission = self.mission_of(trip);
+        let stop = self.stop_of(position, &mission);
+        let stop_idx = self.stop_point_idx(&stop);
+        let remove = if let true = self.filters.allowed_sp_idx.is_empty() {
+            self.filters.forbidden_sp_idx.contains(&stop_idx)
+        } else {
+            !self.filters.allowed_sp_idx.contains(&stop_idx)
+                || self.filters.forbidden_sp_idx.contains(&stop_idx)
+        };
+        if let true = remove {
+            None
+        } else {
+            self.transit_data.timetables.board_time_of(trip, position)
+        }
     }
 
     fn debark_time_of(
@@ -156,7 +169,20 @@ where
         trip: &Self::Trip,
         position: &Self::Position,
     ) -> Option<(SecondsSinceDatasetUTCStart, Load)> {
-        self.transit_data.timetables.debark_time_of(trip, position)
+        let mission = self.mission_of(trip);
+        let stop = self.stop_of(position, &mission);
+        let stop_idx = self.stop_point_idx(&stop);
+        let remove = if let true = self.filters.allowed_sp_idx.is_empty() {
+            self.filters.forbidden_sp_idx.contains(&stop_idx)
+        } else {
+            !self.filters.allowed_sp_idx.contains(&stop_idx)
+                || self.filters.forbidden_sp_idx.contains(&stop_idx)
+        };
+        if let true = remove {
+            None
+        } else {
+            self.transit_data.timetables.debark_time_of(trip, position)
+        }
     }
 
     fn arrival_time_of(
@@ -291,14 +317,22 @@ where
 
 impl<'a, Timetables> data_interface::DataIters<'a> for TransitDataFiltered<'_, Timetables>
 where
-    Timetables: TimetablesTrait + TimetablesIter<'a>,
+    Timetables: TimetablesTrait + for<'b> TimetablesIter<'b> + Debug,
     Timetables::Mission: 'a,
     Timetables::Position: 'a,
 {
     type MissionsAtStop = MissionsOfStop<'a, Timetables>;
 
     fn boardable_missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop {
-        self.transit_data.missions_of(stop)
+        self.transit_data.missions_of_filtered(stop, |inner_stop| {
+            let sp_idx = self.transit_data.stops_data[inner_stop.idx].stop_point_idx;
+            if let true = self.filters.allowed_sp_idx.is_empty() {
+                self.filters.forbidden_sp_idx.contains(&sp_idx)
+            } else {
+                !self.filters.allowed_sp_idx.contains(&sp_idx)
+                    || self.filters.forbidden_sp_idx.contains(&sp_idx)
+            }
+        })
     }
 
     type OutgoingTransfersAtStop = iters::OutgoingTransfersAtStop<'a>;
