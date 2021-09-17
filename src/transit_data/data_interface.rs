@@ -21,6 +21,7 @@ pub trait TransitTypes {
     type Mission: Debug + Clone;
 
     /// Identify a step along a `Mission`
+    /// Identify a step along a `Mission`
     type Position: Debug + Clone;
 
     /// A trip of a vehicle along a `Mission`
@@ -129,12 +130,6 @@ pub trait Data: TransitTypes {
 
     fn is_same_stop(&self, stop_a: &Self::Stop, stop_b: &Self::Stop) -> bool;
 
-    fn new(
-        model: &Model,
-        loads_data: &LoadsData,
-        default_transfer_duration: PositiveDuration,
-    ) -> Self;
-
     fn calendar(&self) -> &crate::time::Calendar;
 
     fn stop_point_idx_to_stop(&self, stop_idx: &Idx<StopPoint>) -> Option<Self::Stop>;
@@ -154,6 +149,14 @@ pub trait Data: TransitTypes {
     /// Returns an usize between 0 and nb_of_misions()
     /// Returns a different value for two different `mission`s
     fn mission_id(&self, mission: &Self::Mission) -> usize;
+}
+
+pub trait DataIO {
+    fn new(
+        model: &Model,
+        loads_data: &LoadsData,
+        default_transfer_duration: PositiveDuration,
+    ) -> Self;
 }
 
 pub trait DataIters<'a>: TransitTypes

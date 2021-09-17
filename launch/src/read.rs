@@ -35,17 +35,21 @@
 // www.navitia.io
 
 use super::config;
+use crate::loki::timetables::TimetablesIter;
+use crate::loki::TransitData;
 use loki::log::{info, warn};
+use loki::timetables::Timetables as TimetablesTrait;
 use loki::transit_model::{self, Model};
 use loki::LoadsData;
-use loki::{DataTrait, PositiveDuration};
+use loki::{DataIO, DataTrait, PositiveDuration};
+use std::fmt::Debug;
 use std::{collections::BTreeMap, time::SystemTime};
 
-pub fn read<Data>(
+pub fn read<Timetables>(
     launch_params: &config::LaunchParams,
-) -> Result<(Data, Model), transit_model::Error>
+) -> Result<(TransitData<Timetables>, Model), transit_model::Error>
 where
-    Data: DataTrait,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
 {
     let model = match launch_params.input_data_type {
         config::InputDataType::Ntfs => transit_model::ntfs::read(&launch_params.input_data_path)?,
@@ -93,7 +97,7 @@ where
         })
         .unwrap_or_else(LoadsData::empty);
 
-    let data = build_transit_data::<Data>(
+    let data = build_transit_data(
         &model,
         &loads_data,
         &launch_params.default_transfer_duration,
@@ -102,11 +106,14 @@ where
     Ok((data, model))
 }
 
-pub fn build_transit_data<Data: DataTrait>(
+pub fn build_transit_data<Timetables>(
     model: &Model,
     loads_data: &LoadsData,
     default_transfer_duration: &PositiveDuration,
-) -> Data {
+) -> TransitData<Timetables>
+where
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+{
     info!("Transit model loaded");
     info!(
         "Number of vehicle journeys : {}",
@@ -115,7 +122,7 @@ pub fn build_transit_data<Data: DataTrait>(
     info!("Number of routes : {}", model.routes.len());
 
     let data_timer = SystemTime::now();
-    let data = Data::new(model, loads_data, *default_transfer_duration);
+    let data = TransitData::new(model, loads_data, *default_transfer_duration);
     let data_build_duration = data_timer.elapsed().unwrap().as_millis();
     info!("Data constructed in {} ms", data_build_duration);
     info!("Number of missions {} ", data.nb_of_missions());

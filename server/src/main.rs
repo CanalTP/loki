@@ -42,10 +42,12 @@ pub mod navitia_proto {
 mod response;
 
 use launch::config;
-use launch::loki::{self, DataWithIters};
+use launch::loki::{self, TransitData};
 use launch::solver::Solver;
+use loki::transit_data_filtered::DataFilter;
 
 use loki::log::{debug, error, info, warn};
+use loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
 use loki::transit_model;
 use loki::RequestInput;
 use loki::{DailyData, PeriodicData, PeriodicSplitVjData, PositiveDuration};
@@ -63,6 +65,7 @@ use std::convert::TryFrom;
 use launch::datetime::DateTimeRepresent;
 use launch::filter_utility::create_filter_idx;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -169,19 +172,28 @@ fn launch(config: Config) -> Result<(), Error> {
     }
 }
 
-fn config_launch<Data>(config: Config) -> Result<(), Error>
+fn config_launch<Timetables>(config: Config) -> Result<(), Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
-    let (data, model) = launch::read::<Data>(&config.launch_params)?;
+    let (data, model) = launch::read::<Timetables>(&config.launch_params)?;
 
     server_loop(&model, &data, &config)
 }
 
-fn server_loop<Data>(model: &Model, data: &Data, config: &Config) -> Result<(), Error>
+fn server_loop<Timetables>(
+    model: &Model,
+    data: &TransitData<Timetables>,
+    config: &Config,
+) -> Result<(), Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
+    use loki::DataTrait;
     let mut solver = Solver::new(data.nb_of_stops(), data.nb_of_missions());
     let context = zmq::Context::new();
     let basic_requests_socket = context
@@ -259,17 +271,19 @@ where
     }
 }
 
-fn solve<Data>(
+fn solve<Timetables>(
     socket: &zmq::Socket,
     zmq_message: &mut zmq::Message,
-    data: &Data,
+    data: &TransitData<Timetables>,
     model: &Model,
-    solver: &mut Solver<Data>,
+    solver: &mut Solver<Timetables>,
     config: &Config,
     comparator_type: config::ComparatorType,
 ) -> Result<(RequestInput, Vec<loki::response::Response>), Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
     let proto_request = decode_zmq_message(socket, zmq_message)?;
     info!(
@@ -405,7 +419,7 @@ where
         config.request_default_params.max_nb_of_legs
     });
 
-    let (forbidden_sp_idx, allowed_sp_idx) = create_filter_idx(
+    let filters = create_filter_idx(
         model,
         &journey_request.forbidden_uris,
         &journey_request.allowed_id,
@@ -419,8 +433,12 @@ where
         max_nb_of_legs,
         max_journey_duration,
         too_late_threshold: config.request_default_params.too_late_threshold,
-        forbidden_sp_idx,
-        allowed_sp_idx,
+        filters: DataFilter {
+            forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
+            allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
+            forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
+            allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
+        },
     };
 
     let datetime_represent = match journey_request.clockwise {

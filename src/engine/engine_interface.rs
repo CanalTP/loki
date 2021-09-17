@@ -1,5 +1,5 @@
+use crate::response;
 use crate::transit_data::data_interface;
-use crate::{response, Idx, StopPoint};
 
 pub trait RequestTypes: data_interface::TransitTypes {
     /// Identify a possible departure of a journey
@@ -241,8 +241,7 @@ pub struct RequestInput {
     pub max_nb_of_legs: u8,
     pub max_journey_duration: PositiveDuration,
     pub too_late_threshold: PositiveDuration,
-    pub forbidden_sp_idx: HashSet<Idx<StopPoint>>,
-    pub allowed_sp_idx: HashSet<Idx<StopPoint>>,
+    pub filters: DataFilter,
 }
 
 pub trait RequestIO<'data, 'model, Data: data_interface::Data>: Request {
@@ -316,8 +315,8 @@ use std::fmt;
 
 use chrono::NaiveDateTime;
 
+use crate::transit_data_filtered::DataFilter;
 use crate::PositiveDuration;
-use std::collections::HashSet;
 
 impl fmt::Display for BadRequest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

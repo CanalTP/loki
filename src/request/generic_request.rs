@@ -112,13 +112,9 @@ pub struct Types<Data> {
 
 impl<'data, Data: DataTrait> TransitTypes for Types<Data> {
     type Stop = Data::Stop;
-
     type Mission = Data::Mission;
-
     type Position = Data::Position;
-
     type Trip = Data::Trip;
-
     type Transfer = Data::Transfer;
 }
 

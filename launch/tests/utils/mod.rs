@@ -41,16 +41,20 @@ use failure::{format_err, Error};
 use launch::config;
 use launch::config::launch_params::default_transfer_duration;
 use launch::datetime::DateTimeRepresent;
+use launch::filter_utility::create_filter_idx;
 use launch::loki::response::VehicleSection;
+use launch::loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
+use launch::loki::transit_data_filtered::DataFilter;
 use launch::loki::{response, Idx, RequestInput, StopPoint};
 use launch::solver::Solver;
 use loki::chrono::TimeZone;
-use loki::chrono_tz;
 use loki::log::debug;
 use loki::transit_model::Model;
-use loki::{DailyData, DataWithIters, NaiveDateTime, PeriodicData, PeriodicSplitVjData};
+use loki::{chrono_tz, TransitData};
+use loki::{DailyData, NaiveDateTime, PeriodicData, PeriodicSplitVjData};
 use loki::{LoadsData, PositiveDuration};
 use model_builder::AsDateTime;
+use std::fmt::Debug;
 
 pub fn init_logger() {
     let _ = env_logger::Builder::from_env(
@@ -80,6 +84,12 @@ pub struct Config {
 
     /// name of the end stop_area
     pub end: String,
+
+    // Allowed_uri
+    pub allowed_uri: Vec<String>,
+
+    // Forbidden_uri
+    pub forbidden_uri: Vec<String>,
 }
 
 impl Config {
@@ -105,15 +115,19 @@ impl Config {
             default_transfer_duration: default_transfer_duration(),
             start: start.into(),
             end: end.into(),
+            allowed_uri: Default::default(),
+            forbidden_uri: Default::default(),
         }
     }
 }
 
-fn make_request_from_config(config: &Config) -> Result<RequestInput, Error> {
+fn make_request_from_config(model: &Model, config: &Config) -> Result<RequestInput, Error> {
     let datetime = config.datetime;
 
     let start_stop_point_uri = &config.start;
     let end_stop_point_uri = &config.end;
+
+    let filters = create_filter_idx(model, &config.forbidden_uri, &config.forbidden_uri);
 
     let request_input = RequestInput {
         datetime,
@@ -130,6 +144,12 @@ fn make_request_from_config(config: &Config) -> Result<RequestInput, Error> {
         max_nb_of_legs: config.request_params.max_nb_of_legs,
         max_journey_duration: config.request_params.max_journey_duration,
         too_late_threshold: config.request_params.too_late_threshold,
+        filters: DataFilter {
+            forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
+            allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
+            forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
+            allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
+        },
     };
     Ok(request_input)
 }
@@ -150,20 +170,23 @@ pub fn build_and_solve(
     }
 }
 
-fn build_and_solve_inner<Data>(
+fn build_and_solve_inner<Timetables>(
     model: &Model,
     loads_data: &LoadsData,
     config: &Config,
 ) -> Result<Vec<response::Response>, Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
-    let data: Data =
+    use loki::DataTrait;
+    let data: TransitData<Timetables> =
         launch::read::build_transit_data(model, loads_data, &config.default_transfer_duration);
 
-    let mut solver = Solver::<Data>::new(data.nb_of_stops(), data.nb_of_missions());
+    let mut solver = Solver::new(data.nb_of_stops(), data.nb_of_missions());
 
-    let request_input = make_request_from_config(config)?;
+    let request_input = make_request_from_config(model, config)?;
 
     let responses = solver.solve_request(
         &data,

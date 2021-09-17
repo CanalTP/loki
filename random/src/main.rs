@@ -1,4 +1,4 @@
-use launch::loki::{self, DataWithIters};
+use launch::loki::{self, TransitData};
 use launch::solver::Solver;
 use launch::{
     config,
@@ -9,6 +9,7 @@ use loki::log;
 
 use loki::{log::debug, transit_model::Model};
 
+use loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
 use std::convert::TryFrom;
 use std::{fs::File, io::BufReader, time::SystemTime};
 
@@ -16,6 +17,7 @@ use failure::{bail, Error};
 
 use launch::datetime::DateTimeRepresent;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use structopt::StructOpt;
 
 fn main() {
@@ -148,18 +150,27 @@ pub fn launch(config: Config) -> Result<(), Error> {
     }
 }
 
-pub fn config_launch<Data>(config: Config) -> Result<(), Error>
+fn config_launch<Timetables>(config: Config) -> Result<(), Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
-    let (data, model): (Data, Model) = launch::read(&config.launch_params)?;
+    let (data, model) = launch::read::<Timetables>(&config.launch_params)?;
     build_engine_and_solve(&model, &data, &config)
 }
 
-fn build_engine_and_solve<Data>(model: &Model, data: &Data, config: &Config) -> Result<(), Error>
+fn build_engine_and_solve<Timetables>(
+    model: &Model,
+    data: &TransitData<Timetables>,
+    config: &Config,
+) -> Result<(), Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
+    use loki::DataTrait;
     let mut solver = Solver::new(data.nb_of_stops(), data.nb_of_missions());
 
     let departure_datetime = match &config.departure_datetime {

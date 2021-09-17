@@ -39,20 +39,31 @@ use std::{fmt::Debug, time::SystemTime};
 use loki::log::{debug, info, trace};
 
 use loki::{
-    response, transit_model, BadRequest, DataTrait, DataWithIters, MultiCriteriaRaptor,
-    RequestDebug, RequestIO, RequestInput, RequestTypes, RequestWithIters,
+    response, transit_model, BadRequest, MultiCriteriaRaptor, RequestDebug, RequestIO,
+    RequestInput, RequestTypes, RequestWithIters,
 };
 
 use crate::datetime::DateTimeRepresent;
 
 use super::config;
+use crate::loki::{DataTrait, TransitData};
 use loki::request::{self, generic_request::Types};
+use loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
+use loki::transit_data_filtered::TransitDataFiltered;
 
-pub struct Solver<Data: DataTrait> {
-    engine: MultiCriteriaRaptor<Types<Data>>,
+pub struct Solver<Timetables>
+where
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+{
+    engine: MultiCriteriaRaptor<Types<TransitData<Timetables>>>,
 }
 
-impl<Data: DataTrait> Solver<Data> {
+impl<Timetables> Solver<Timetables>
+where
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
+{
     pub fn new(nb_of_stops: usize, nb_of_missions: usize) -> Self {
         Self {
             engine: MultiCriteriaRaptor::new(nb_of_stops, nb_of_missions),
@@ -61,7 +72,7 @@ impl<Data: DataTrait> Solver<Data> {
 
     pub fn solve_request(
         &mut self,
-        data: &Data,
+        data: &TransitData<Timetables>,
         model: &transit_model::Model,
         request_input: &RequestInput,
         comparator_type: &config::ComparatorType,
@@ -69,58 +80,89 @@ impl<Data: DataTrait> Solver<Data> {
     ) -> Result<Vec<response::Response>, BadRequest>
     where
         Self: Sized,
-        Data: DataWithIters,
     {
         use crate::datetime::DateTimeRepresent::*;
         use config::ComparatorType::*;
 
-        let filtered_request =
-            request_input.forbidden_sp_idx.is_empty() && request_input.allowed_sp_idx.is_empty();
+        let filtered_request = !request_input.filters.is_empty();
 
-        let responses = match (datetime_represent, comparator_type, filtered_request) {
-            (Arrival, Loads, true) => {
-                let request = request::arrive_before::loads_comparator::Request::new(
-                    model,
-                    data,
-                    request_input,
-                )?;
-                solve_request_inner(&mut self.engine, &request, data)
-            }
-            (Departure, Loads, true) => {
-                let request = request::depart_after::loads_comparator::Request::new(
-                    model,
-                    data,
-                    request_input,
-                )?;
-                solve_request_inner(&mut self.engine, &request, data)
-            }
-            (Arrival, Basic, true) => {
-                let request = request::arrive_before::basic_comparator::Request::new(
-                    model,
-                    data,
-                    request_input,
-                )?;
-                solve_request_inner(&mut self.engine, &request, data)
-            }
-            (Departure, Basic, true) => {
-                let request = request::depart_after::basic_comparator::Request::new(
-                    model,
-                    data,
-                    request_input,
-                )?;
-                solve_request_inner(&mut self.engine, &request, data)
-            }
-            (Departure, Basic, false) => {
-                let request = request::depart_after_filtered::basic_comparator::Request::new(
-                    model,
-                    data,
-                    request_input,
-                )?;
-                solve_request_inner(&mut self.engine, &request, data)
-            }
-            _ => return Err(BadRequest::NoValidDepartureStop),
-        };
-        Ok(responses)
+        if let true = filtered_request {
+            let data = TransitDataFiltered {
+                transit_data: data,
+                filters: request_input.filters.clone(),
+            };
+            let responses = match (datetime_represent, comparator_type) {
+                (Arrival, Loads) => {
+                    let request = request::arrive_before::loads_comparator::Request::new(
+                        model,
+                        &data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, &data)
+                }
+                (Departure, Loads) => {
+                    let request = request::depart_after::loads_comparator::Request::new(
+                        model,
+                        &data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, &data)
+                }
+                (Arrival, Basic) => {
+                    let request = request::arrive_before::basic_comparator::Request::new(
+                        model,
+                        &data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, &data)
+                }
+                (Departure, Basic) => {
+                    let request = request::depart_after::basic_comparator::Request::new(
+                        model,
+                        &data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, &data)
+                }
+            };
+            Ok(responses)
+        } else {
+            let responses = match (datetime_represent, comparator_type) {
+                (Arrival, Loads) => {
+                    let request = request::arrive_before::loads_comparator::Request::new(
+                        model,
+                        data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, data)
+                }
+                (Departure, Loads) => {
+                    let request = request::depart_after::loads_comparator::Request::new(
+                        model,
+                        data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, data)
+                }
+                (Arrival, Basic) => {
+                    let request = request::arrive_before::basic_comparator::Request::new(
+                        model,
+                        data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, data)
+                }
+                (Departure, Basic) => {
+                    let request = request::depart_after::basic_comparator::Request::new(
+                        model,
+                        data,
+                        request_input,
+                    )?;
+                    solve_request_inner(&mut self.engine, &request, data)
+                }
+            };
+            Ok(responses)
+        }
     }
 }
 
