@@ -158,6 +158,16 @@ pub trait Timetables: Types {
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>;
 
+    fn latest_filtered_trip_that_debark_at<Filter>(
+        &self,
+        time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&Self::VehicleData) -> bool;
+
     fn insert<'date, Stops, Flows, Dates, Times>(
         &mut self,
         stops: Stops,

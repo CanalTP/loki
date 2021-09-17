@@ -210,6 +210,21 @@ impl TimetablesTrait for DailyTimetables {
             .map(|(trip, time, load)| (trip, *time, *load))
     }
 
+    fn latest_filtered_trip_that_debark_at<Filter>(
+        &self,
+        time: &SecondsSinceDatasetUTCStart,
+        mission: &Self::Mission,
+        position: &Self::Position,
+        filter: Filter,
+    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
+    where
+        Filter: Fn(&Self::VehicleData) -> bool,
+    {
+        self.timetables
+            .latest_filtered_vehicle_that_debark(time, mission, position, filter)
+            .map(|(trip, time, load)| (trip, *time, *load))
+    }
+
     fn insert<'date, Stops, Flows, Dates, Times>(
         &mut self,
         stops: Stops,

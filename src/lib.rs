@@ -40,8 +40,9 @@ mod engine;
 pub mod loads_data;
 pub mod request;
 pub mod time;
-mod timetables;
+pub mod timetables;
 mod transit_data;
+pub mod transit_data_filtered;
 
 pub use chrono;
 pub use chrono::NaiveDateTime;
@@ -51,11 +52,11 @@ pub use time::PositiveDuration;
 pub use transit_model;
 pub use typed_index_collection;
 
-pub use transit_data::data_interface::{Data as DataTrait, DataWithIters};
+pub use transit_data::data_interface::{Data as DataTrait, DataIO, DataWithIters};
 
-pub type DailyData = transit_data::TransitData<timetables::DailyTimetables>;
-pub type PeriodicData = transit_data::TransitData<timetables::PeriodicTimetables>;
-pub type PeriodicSplitVjData = transit_data::TransitData<timetables::PeriodicSplitVjByTzTimetables>;
+pub type DailyData = timetables::DailyTimetables;
+pub type PeriodicData = timetables::PeriodicTimetables;
+pub type PeriodicSplitVjData = timetables::PeriodicSplitVjByTzTimetables;
 
 pub use loads_data::LoadsData;
 

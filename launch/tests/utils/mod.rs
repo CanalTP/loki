@@ -45,9 +45,9 @@ use launch::loki::response::VehicleSection;
 use launch::loki::{response, Idx, RequestInput, StopPoint};
 use launch::solver::Solver;
 use loki::chrono::TimeZone;
-use loki::chrono_tz;
 use loki::log::debug;
 use loki::transit_model::Model;
+use loki::{chrono_tz, TransitData};
 use loki::{DailyData, DataWithIters, NaiveDateTime, PeriodicData, PeriodicSplitVjData};
 use loki::{LoadsData, PositiveDuration};
 use model_builder::AsDateTime;
@@ -80,6 +80,12 @@ pub struct Config {
 
     /// name of the end stop_area
     pub end: String,
+
+    // Allowed_uri
+    pub allowed_uri: Vec<String>,
+
+    // Forbidden_uri
+    pub forbidden_uri: Vec<String>,
 }
 
 impl Config {
@@ -105,6 +111,8 @@ impl Config {
             default_transfer_duration: default_transfer_duration(),
             start: start.into(),
             end: end.into(),
+            allowed_uri: Default::default(),
+            forbidden_uri: Default::default(),
         }
     }
 }
@@ -150,7 +158,7 @@ pub fn build_and_solve(
     }
 }
 
-fn build_and_solve_inner<Data>(
+fn build_and_solve_inner<Timetables>(
     model: &Model,
     loads_data: &LoadsData,
     config: &Config,
@@ -158,7 +166,7 @@ fn build_and_solve_inner<Data>(
 where
     Data: DataWithIters,
 {
-    let data: Data =
+    let data: TransitData<Timetables> =
         launch::read::build_transit_data(model, loads_data, &config.default_transfer_duration);
 
     let mut solver = Solver::<Data>::new(data.nb_of_stops(), data.nb_of_missions());

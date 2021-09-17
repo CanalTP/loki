@@ -1,7 +1,6 @@
 use crate::{
     loads_data::{Load, LoadsData},
     time::{PositiveDuration, SecondsSinceDatasetUTCStart},
-    timetables::generic_timetables::VehicleDataTrait,
 };
 use chrono::{NaiveDate, NaiveDateTime};
 use transit_model::{
@@ -22,6 +21,7 @@ pub trait TransitTypes {
     type Mission: Debug + Clone;
 
     /// Identify a step along a `Mission`
+    /// Identify a step along a `Mission`
     type Position: Debug + Clone;
 
     /// A trip of a vehicle along a `Mission`
@@ -29,8 +29,6 @@ pub trait TransitTypes {
 
     /// Identify a foot transfer between two `Stop`s
     type Transfer: Debug + Clone + 'static;
-
-    type VehicleData: Debug + Clone + VehicleDataTrait;
 }
 
 pub trait Data: TransitTypes {
@@ -115,16 +113,6 @@ pub trait Data: TransitTypes {
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>;
 
-    fn earliest_filtered_trip_to_board_at<Filter>(
-        &self,
-        waiting_time: &SecondsSinceDatasetUTCStart,
-        mission: &Self::Mission,
-        position: &Self::Position,
-        filter: Filter,
-    ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)>
-    where
-        Filter: Fn(&Self::VehicleData) -> bool;
-
     fn latest_trip_that_debark_at(
         &self,
         waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
@@ -141,12 +129,6 @@ pub trait Data: TransitTypes {
     fn day_of(&self, trip: &Self::Trip) -> NaiveDate;
 
     fn is_same_stop(&self, stop_a: &Self::Stop, stop_b: &Self::Stop) -> bool;
-
-    fn new(
-        model: &Model,
-        loads_data: &LoadsData,
-        default_transfer_duration: PositiveDuration,
-    ) -> Self;
 
     fn calendar(&self) -> &crate::time::Calendar;
 
@@ -167,6 +149,14 @@ pub trait Data: TransitTypes {
     /// Returns an usize between 0 and nb_of_misions()
     /// Returns a different value for two different `mission`s
     fn mission_id(&self, mission: &Self::Mission) -> usize;
+}
+
+pub trait DataIO {
+    fn new(
+        model: &Model,
+        loads_data: &LoadsData,
+        default_transfer_duration: PositiveDuration,
+    ) -> Self;
 }
 
 pub trait DataIters<'a>: TransitTypes

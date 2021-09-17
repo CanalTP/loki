@@ -34,13 +34,14 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
-use launch::loki::{self, DataWithIters};
+use launch::loki::{self, TransitData};
 use launch::solver::Solver;
 use launch::{
     config,
     datetime::DateTimeRepresent,
     loki::{DailyData, PeriodicData, PeriodicSplitVjData},
 };
+use loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
 
 use loki::log;
 
@@ -51,6 +52,7 @@ use std::{fs::File, io::BufReader, time::SystemTime};
 use failure::{bail, Error};
 
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -170,24 +172,29 @@ pub fn launch(config: Config) -> Result<(Model, Vec<loki::Response>), Error> {
     }
 }
 
-fn config_launch<Data>(config: Config) -> Result<(Model, Vec<loki::Response>), Error>
+fn config_launch<Timetables>(config: Config) -> Result<(Model, Vec<loki::Response>), Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
-    let (data, model): (Data, Model) = launch::read(&config.launch_params)?;
+    let (data, model) = launch::read::<Timetables>(&config.launch_params)?;
     let result = build_engine_and_solve(&model, &data, &config);
 
     result.map(|responses| (model, responses))
 }
 
-fn build_engine_and_solve<Data>(
+fn build_engine_and_solve<Timetables>(
     model: &Model,
-    data: &Data,
+    data: &TransitData<Timetables>,
     config: &Config,
 ) -> Result<Vec<loki::Response>, Error>
 where
-    Data: DataWithIters,
+    Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
+    Timetables::Mission: 'static,
+    Timetables::Position: 'static,
 {
+    use loki::DataTrait;
     let mut solver = Solver::new(data.nb_of_stops(), data.nb_of_missions());
 
     let datetime = match &config.datetime {

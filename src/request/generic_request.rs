@@ -116,7 +116,6 @@ impl<'data, Data: DataTrait> TransitTypes for Types<Data> {
     type Position = Data::Position;
     type Trip = Data::Trip;
     type Transfer = Data::Transfer;
-    type VehicleData = Data::VehicleData;
 }
 
 impl<'data, Data: DataTrait> RequestTypes for Types<Data> {

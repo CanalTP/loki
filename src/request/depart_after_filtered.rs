@@ -97,10 +97,10 @@ where
             transit_data,
             |sp_idx| {
                 if let true = request_input.allowed_sp_idx.is_empty() {
-                    return !request_input.forbidden_sp_idx.contains(&sp_idx);
+                    !request_input.forbidden_sp_idx.contains(&sp_idx)
                 } else {
-                    return request_input.allowed_sp_idx.contains(&sp_idx)
-                        && !request_input.forbidden_sp_idx.contains(&sp_idx);
+                    request_input.allowed_sp_idx.contains(&sp_idx)
+                        && !request_input.forbidden_sp_idx.contains(&sp_idx)
                 }
             },
         )?;
@@ -111,10 +111,10 @@ where
             transit_data,
             |sp_idx| {
                 if let true = request_input.allowed_sp_idx.is_empty() {
-                    return !request_input.forbidden_sp_idx.contains(&sp_idx);
+                    !request_input.forbidden_sp_idx.contains(&sp_idx)
                 } else {
-                    return request_input.allowed_sp_idx.contains(&sp_idx)
-                        && !request_input.forbidden_sp_idx.contains(&sp_idx);
+                    request_input.allowed_sp_idx.contains(&sp_idx)
+                        && !request_input.forbidden_sp_idx.contains(&sp_idx)
                 }
             },
         )?;
@@ -273,10 +273,10 @@ where
                 |vehicle_data: &Data::VehicleData| {
                     let vj_idx = vehicle_data.get_vehicle_journey_idx();
                     if let true = self.allowed_vj_idx.is_empty() {
-                        return !self.forbidden_vj_idx.contains(&vj_idx);
+                        !self.forbidden_vj_idx.contains(&vj_idx)
                     } else {
-                        return self.allowed_vj_idx.contains(&vj_idx)
-                            && !self.forbidden_vj_idx.contains(&vj_idx);
+                        self.allowed_vj_idx.contains(&vj_idx)
+                            && !self.forbidden_vj_idx.contains(&vj_idx)
                     }
                 },
             )
@@ -497,7 +497,7 @@ where
         let outgoing_transfers = self.transit_data.outgoing_transfers_at(from_stop);
         TransferAtStop {
             from_stop: from_stop.clone(),
-            data: &self.transit_data,
+            data: self.transit_data,
             forbidden: &self.forbidden_sp_idx,
             allowed: &self.allowed_sp_idx,
             inner: outgoing_transfers,
@@ -536,19 +536,18 @@ where
 
         self.inner
             .by_ref()
-            .filter(|(to_stop, _, _)| {
+            .find(|(to_stop, _, _)| {
                 let from_sp_idx = data.stop_point_idx(from_stop);
                 let to_sp_idx = data.stop_point_idx(to_stop);
                 if let true = allowed.is_empty() {
-                    return !forbidden.contains(&from_sp_idx) && !forbidden.contains(&to_sp_idx);
+                    !forbidden.contains(&from_sp_idx) && !forbidden.contains(&to_sp_idx)
                 } else {
-                    return allowed.contains(&from_sp_idx)
+                    allowed.contains(&from_sp_idx)
                         && allowed.contains(&to_sp_idx)
                         && !forbidden.contains(&from_sp_idx)
-                        && !forbidden.contains(&to_sp_idx);
+                        && !forbidden.contains(&to_sp_idx)
                 }
             })
-            .next()
             .map(|(stop, durations, transfer)| {
                 let new_criteria = Criteria {
                     time: self.criteria.time + durations.total_duration,
