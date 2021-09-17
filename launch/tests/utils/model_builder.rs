@@ -35,8 +35,8 @@
 use loki::chrono_tz::{self};
 use loki::transit_model::model::Collections;
 use loki::transit_model::objects::{
-    Calendar, Date, Network, Route, StopPoint, StopTime, Time, Transfer, ValidityPeriod,
-    VehicleJourney,
+    Calendar, CommercialMode, Date, Line, Network, PhysicalMode, Route, StopPoint, StopTime, Time,
+    Transfer, ValidityPeriod, VehicleJourney,
 };
 use loki::transit_model::Model;
 use loki::typed_index_collection::Idx;
@@ -46,6 +46,8 @@ const DEFAULT_CALENDAR_ID: &str = "default_service";
 const DEFAULT_ROUTE_ID: &str = "default_route";
 const DEFAULT_LINE_ID: &str = "default_line";
 const DEFAULT_NETWORK_ID: &str = "default_network";
+const DEFAULT_COMMERCIAL_MODE_ID: &str = "default_commercial_mode";
+const DEFAULT_PHYSICAL_MODE_ID: &str = "default_physical_mode";
 
 pub const DEFAULT_TIMEZONE: chrono_tz::Tz = chrono_tz::UTC;
 
@@ -72,6 +74,8 @@ pub enum VehicleJourneyInfo {
     Route(String),
     Line(String),
     Network(String),
+    CommercialMode(String),
+    PhysicalMode(String),
     Timezone(chrono_tz::Tz),
     None,
 }
@@ -185,6 +189,56 @@ impl<'a> ModelBuilder {
             let mut r = Route::default();
             route_initer(&mut r);
             r
+        });
+        self
+    }
+
+    pub fn network<F>(mut self, id: &str, mut network_initer: F) -> Self
+    where
+        F: FnMut(&mut Network),
+    {
+        self.collections.networks.get_or_create_with(id, || {
+            let mut n = Network::default();
+            network_initer(&mut n);
+            n
+        });
+        self
+    }
+
+    pub fn line<F>(mut self, id: &str, mut line_initer: F) -> Self
+    where
+        F: FnMut(&mut Line),
+    {
+        self.collections.lines.get_or_create_with(id, || {
+            let mut l = Line::default();
+            line_initer(&mut l);
+            l
+        });
+        self
+    }
+
+    pub fn commercial_mode<F>(mut self, id: &str, mut initer: F) -> Self
+    where
+        F: FnMut(&mut CommercialMode),
+    {
+        self.collections
+            .commercial_modes
+            .get_or_create_with(id, || {
+                let mut c = CommercialMode::default();
+                initer(&mut c);
+                c
+            });
+        self
+    }
+
+    pub fn physical_mode<F>(mut self, id: &str, mut initer: F) -> Self
+    where
+        F: FnMut(&mut PhysicalMode),
+    {
+        self.collections.physical_modes.get_or_create_with(id, || {
+            let mut p = PhysicalMode::default();
+            initer(&mut p);
+            p
         });
         self
     }
@@ -511,6 +565,30 @@ impl<'a> VehicleJourneyBuilder<'a> {
         self
     }
 
+    pub fn commercial_mode(mut self, id: &str) -> Self {
+        {
+            assert!(
+                self.info == VehicleJourneyInfo::None,
+                "You cannot specify two different info for a vehicle journey"
+            );
+            self.info = VehicleJourneyInfo::CommercialMode(id.to_string());
+        }
+
+        self
+    }
+
+    pub fn physical_mode(mut self, id: &str) -> Self {
+        {
+            assert!(
+                self.info == VehicleJourneyInfo::None,
+                "You cannot specify two different info for a vehicle journey"
+            );
+            self.info = VehicleJourneyInfo::PhysicalMode(id.to_string());
+        }
+
+        self
+    }
+
     /// Set the calendar (service_id) of the vj
     ///
     /// ```
@@ -600,6 +678,18 @@ impl<'a> Drop for VehicleJourneyBuilder<'a> {
             _ => DEFAULT_NETWORK_ID.to_string(),
         };
         line.deref_mut().network_id = network_id.clone();
+
+        let commercial_mode_id = match &self.info {
+            VehicleJourneyInfo::CommercialMode(id) => id.clone(),
+            _ => DEFAULT_COMMERCIAL_MODE_ID.to_string(),
+        };
+        line.deref_mut().commercial_mode_id = commercial_mode_id;
+
+        let physical_mode_id = match &self.info {
+            VehicleJourneyInfo::PhysicalMode(id) => id.clone(),
+            _ => DEFAULT_PHYSICAL_MODE_ID.to_string(),
+        };
+        new_vj.deref_mut().physical_mode_id = physical_mode_id;
 
         let timezone = match &self.info {
             VehicleJourneyInfo::Timezone(timezone) => Some(*timezone),
