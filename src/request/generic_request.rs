@@ -172,14 +172,6 @@ where
         .iter()
         .enumerate()
         .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
-            let stop_idx = model.stop_points.get_idx(stop_point_uri).or(None)?;
-            if filter(stop_idx) {
-                Some((idx, (stop_point_uri, fallback_duration)))
-            } else {
-                None
-            }
-        })
-        .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
             let stop_idx = model.stop_points.get_idx(stop_point_uri).or_else(|| {
                 warn!(
                     "The {}th departure stop point {} is not found in model. \
@@ -188,15 +180,19 @@ where
                 );
                 None
             })?;
-            let stop = transit_data.stop_point_idx_to_stop(&stop_idx).or_else(|| {
-                warn!(
+            if filter(stop_idx) {
+                let stop = transit_data.stop_point_idx_to_stop(&stop_idx).or_else(|| {
+                    warn!(
                     "The {}th departure stop point {} with idx {:?} is not found in transit_data. \
                         I ignore it",
                     idx, stop_point_uri, stop_idx
                 );
+                    None
+                })?;
+                Some((stop, *fallback_duration))
+            } else {
                 None
-            })?;
-            Some((stop, *fallback_duration))
+            }
         })
         .collect();
     if result.is_empty() {
@@ -235,14 +231,6 @@ where
         .iter()
         .enumerate()
         .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
-            let stop_idx = model.stop_points.get_idx(stop_point_uri).or(None)?;
-            if filter(stop_idx) {
-                Some((idx, (stop_point_uri, fallback_duration)))
-            } else {
-                None
-            }
-        })
-        .filter_map(|(idx, (stop_point_uri, fallback_duration))| {
             let stop_idx = model.stop_points.get_idx(stop_point_uri).or_else(|| {
                 warn!(
                     "The {}th arrival stop point {} is not found in model. \
@@ -251,15 +239,19 @@ where
                 );
                 None
             })?;
-            let stop = transit_data.stop_point_idx_to_stop(&stop_idx).or_else(|| {
-                warn!(
+            if filter(stop_idx) {
+                let stop = transit_data.stop_point_idx_to_stop(&stop_idx).or_else(|| {
+                    warn!(
                     "The {}th arrival stop point {} with idx {:?} is not found in transit_data. \
                         I ignore it",
                     idx, stop_point_uri, stop_idx
                 );
+                    None
+                })?;
+                Some((stop, *fallback_duration))
+            } else {
                 None
-            })?;
-            Some((stop, *fallback_duration))
+            }
         })
         .collect();
     if result.is_empty() {

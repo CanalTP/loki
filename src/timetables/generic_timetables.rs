@@ -162,7 +162,6 @@ where
         timetable: &Timetable,
     ) -> bool {
         assert!(upstream.timetable == *timetable);
-        assert!(upstream.timetable == *timetable);
         upstream.idx < downstream.idx
     }
 

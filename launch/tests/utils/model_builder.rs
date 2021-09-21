@@ -661,7 +661,9 @@ impl<'a> Drop for VehicleJourneyBuilder<'a> {
         let mut route = collections.routes.get_or_create(&new_vj.route_id);
         let line_id = match &self.info {
             VehicleJourneyInfo::Line(id) => id.clone(),
-            VehicleJourneyInfo::Network(_) | VehicleJourneyInfo::Timezone(_) => {
+            VehicleJourneyInfo::Network(_)
+            | VehicleJourneyInfo::Timezone(_)
+            | VehicleJourneyInfo::CommercialMode(_) => {
                 format!("line_{}", new_vj.id)
             }
             _ => DEFAULT_LINE_ID.to_string(),
