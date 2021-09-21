@@ -444,8 +444,8 @@ where
         }
     }
 
-    fn boardable_missions_at(&'outer self, stop: &Data::Stop) -> Data::MissionsAtStop {
-        self.transit_data.boardable_missions_at(stop)
+    fn missions_at(&'outer self, stop: &Data::Stop) -> Data::MissionsAtStop {
+        self.transit_data.missions_at(stop)
     }
 
     fn transfers_at(

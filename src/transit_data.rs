@@ -293,7 +293,7 @@ where
 {
     type MissionsAtStop = MissionsOfStop<'a, Timetables>;
 
-    fn boardable_missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop {
+    fn missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop {
         self.missions_of(stop)
     }
 

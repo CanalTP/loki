@@ -208,7 +208,7 @@ pub trait RequestIters<'a>: RequestTypes {
     /// Returns all the `Mission`s that can be boarded at `stop`.
     ///
     /// Should not return twice the same `Mission`.
-    fn boardable_missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop;
+    fn missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop;
 
     /// Iterator for all `Transfer`s that can be taken at a `Stop`
     type TransfersAtStop: Iterator<Item = (Self::Stop, Self::Criteria, Self::Transfer)>;

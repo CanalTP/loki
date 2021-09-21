@@ -59,7 +59,7 @@ impl<Timetables: TimetablesTrait> TransitData<Timetables> {
     where
         Filter: Fn(&Stop) -> bool,
     {
-        if let true = filter(stop) {
+        if filter(stop) {
             let stop_data = self.stop_data(stop);
             MissionsOfStop {
                 inner: stop_data.position_in_timetables.iter(),

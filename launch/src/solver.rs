@@ -86,7 +86,7 @@ where
 
         let filtered_request = !request_input.filters.is_empty();
 
-        if let true = filtered_request {
+        if filtered_request {
             let data = TransitDataFiltered {
                 transit_data: data,
                 filters: request_input.filters.clone(),

@@ -48,6 +48,7 @@ use std::fmt::Debug;
 
 use crate::timetables::generic_timetables::VehicleDataTrait;
 use crate::timetables::{Stop, Timetables as TimetablesTrait, TimetablesIter};
+use crate::transit_data::data_interface::Data;
 use crate::transit_data::{data_interface, iters, StopData, Transfer};
 use std::collections::HashSet;
 
@@ -65,6 +66,21 @@ impl DataFilter {
             && self.allowed_sp_idx.is_empty()
             && self.forbidden_vj_idx.is_empty()
             && self.allowed_vj_idx.is_empty()
+    }
+    pub fn is_sp_allowed(&self, stop_idx: Idx<StopPoint>) -> bool {
+        if self.allowed_sp_idx.is_empty() {
+            !self.forbidden_sp_idx.contains(&stop_idx)
+        } else {
+            self.allowed_sp_idx.contains(&stop_idx) && !self.forbidden_sp_idx.contains(&stop_idx)
+        }
+    }
+
+    pub fn is_vj_allowed(&self, vj_idx: Idx<VehicleJourney>) -> bool {
+        if self.allowed_vj_idx.is_empty() {
+            !self.forbidden_vj_idx.contains(&vj_idx)
+        } else {
+            self.allowed_vj_idx.contains(&vj_idx) && !self.forbidden_vj_idx.contains(&vj_idx)
+        }
     }
 }
 
@@ -151,13 +167,8 @@ where
         let mission = self.mission_of(trip);
         let stop = self.stop_of(position, &mission);
         let stop_idx = self.stop_point_idx(&stop);
-        let allowed_stop = if let true = self.filters.allowed_sp_idx.is_empty() {
-            !self.filters.forbidden_sp_idx.contains(&stop_idx)
-        } else {
-            self.filters.allowed_sp_idx.contains(&stop_idx)
-                && !self.filters.forbidden_sp_idx.contains(&stop_idx)
-        };
-        if let true = allowed_stop {
+
+        if self.filters.is_sp_allowed(stop_idx) {
             self.transit_data.timetables.board_time_of(trip, position)
         } else {
             None
@@ -172,13 +183,8 @@ where
         let mission = self.mission_of(trip);
         let stop = self.stop_of(position, &mission);
         let stop_idx = self.stop_point_idx(&stop);
-        let allowed_stop = if let true = self.filters.allowed_sp_idx.is_empty() {
-            !self.filters.forbidden_sp_idx.contains(&stop_idx)
-        } else {
-            self.filters.allowed_sp_idx.contains(&stop_idx)
-                && !self.filters.forbidden_sp_idx.contains(&stop_idx)
-        };
-        if let true = allowed_stop {
+
+        if self.filters.is_sp_allowed(stop_idx) {
             self.transit_data.timetables.debark_time_of(trip, position)
         } else {
             None
@@ -224,22 +230,24 @@ where
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)> {
-        self.transit_data
-            .timetables
-            .earliest_filtered_trip_to_board_at(
-                waiting_time,
-                mission,
-                position,
-                |vehicle_data: &Timetables::VehicleData| {
-                    let vj_idx = vehicle_data.get_vehicle_journey_idx();
-                    if let true = self.filters.allowed_vj_idx.is_empty() {
-                        !self.filters.forbidden_vj_idx.contains(&vj_idx)
-                    } else {
-                        self.filters.allowed_vj_idx.contains(&vj_idx)
-                            && !self.filters.forbidden_vj_idx.contains(&vj_idx)
-                    }
-                },
-            )
+        let stop = self.stop_of(position, mission);
+        let stop_idx = self.stop_point_idx(&stop);
+
+        if self.filters.is_sp_allowed(stop_idx) {
+            self.transit_data
+                .timetables
+                .earliest_filtered_trip_to_board_at(
+                    waiting_time,
+                    mission,
+                    position,
+                    |vehicle_data: &Timetables::VehicleData| {
+                        let vj_idx = vehicle_data.get_vehicle_journey_idx();
+                        self.filters.is_vj_allowed(vj_idx)
+                    },
+                )
+        } else {
+            None
+        }
     }
 
     fn latest_trip_that_debark_at(
@@ -248,9 +256,24 @@ where
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)> {
-        self.transit_data
-            .timetables
-            .latest_trip_that_debark_at(waiting_time, mission, position)
+        let stop = self.stop_of(position, mission);
+        let stop_idx = self.stop_point_idx(&stop);
+
+        if self.filters.is_sp_allowed(stop_idx) {
+            self.transit_data
+                .timetables
+                .latest_filtered_trip_that_debark_at(
+                    waiting_time,
+                    mission,
+                    position,
+                    |vehicle_data: &Timetables::VehicleData| {
+                        let vj_idx = vehicle_data.get_vehicle_journey_idx();
+                        self.filters.is_vj_allowed(vj_idx)
+                    },
+                )
+        } else {
+            None
+        }
     }
 
     fn to_naive_datetime(
@@ -323,15 +346,10 @@ where
 {
     type MissionsAtStop = MissionsOfStop<'a, Timetables>;
 
-    fn boardable_missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop {
+    fn missions_at(&'a self, stop: &Self::Stop) -> Self::MissionsAtStop {
         self.transit_data.missions_of_filtered(stop, |inner_stop| {
-            let sp_idx = self.transit_data.stops_data[inner_stop.idx].stop_point_idx;
-            if let true = self.filters.allowed_sp_idx.is_empty() {
-                !self.filters.forbidden_sp_idx.contains(&sp_idx)
-            } else {
-                self.filters.allowed_sp_idx.contains(&sp_idx)
-                    && !self.filters.forbidden_sp_idx.contains(&sp_idx)
-            }
+            let sp_idx = self.transit_data.stop_point_idx(inner_stop);
+            self.filters.is_sp_allowed(sp_idx)
         })
     }
 

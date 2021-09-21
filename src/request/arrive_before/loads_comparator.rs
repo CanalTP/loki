@@ -195,8 +195,8 @@ where
     }
 
     type MissionsAtStop = Data::MissionsAtStop;
-    fn boardable_missions_at(&'outer self, stop: &Self::Stop) -> Self::MissionsAtStop {
-        self.generic.boardable_missions_at(stop)
+    fn missions_at(&'outer self, stop: &Self::Stop) -> Self::MissionsAtStop {
+        self.generic.missions_at(stop)
     }
 
     type TransfersAtStop = super::TransferAtStop<'outer, Data>;

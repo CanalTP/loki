@@ -265,7 +265,7 @@ where
                 "Identifying missions with new waits at {}",
                 pt.stop_name(stop)
             );
-            for (mission, position) in pt.boardable_missions_at(stop) {
+            for (mission, position) in pt.missions_at(stop) {
                 let current_mission_has_new_wait =
                     &mut self.mission_has_new_wait[pt.mission_id(&mission)];
                 // trace!("   mission {}", pt.mission_name(&mission));

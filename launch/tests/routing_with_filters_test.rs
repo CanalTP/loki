@@ -47,10 +47,6 @@ use utils::{build_and_solve, make_pt_from_vehicle, Config};
 pub fn fixture_model() -> Model {
     ModelBuilder::new("2020-01-01", "2020-01-02")
         .network("N1", |n| n.name = "N1".into())
-        .line("L1", |l| l.name = "L1".into())
-        .line("L2", |l| l.name = "L2".into())
-        .line("L3", |l| l.name = "L3".into())
-        .line("L4", |l| l.name = "L3".into())
         .route("R1", |r| r.name = "R1".into())
         .route("R2", |r| r.name = "R2".into())
         .route("R3", |r| r.name = "R3".into())
