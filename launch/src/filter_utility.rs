@@ -112,14 +112,6 @@ fn pt_object_to_vj<T>(
     vj_index_set.extend(vj_set);
 }
 
-fn pt_object_to_sp<T>(model: &Model, pt_index_set: &IdxSet<T>, sp_index_set: &mut IdxSet<StopPoint>)
-where
-    IdxSet<T>: GetCorresponding<StopPoint>,
-{
-    let sp_set: IdxSet<StopPoint> = pt_index_set.get_corresponding(model);
-    sp_index_set.extend(sp_set);
-}
-
 fn parse_uri<T: AsRef<str>>(
     model: &Model,
     uris: &[T],
@@ -139,8 +131,10 @@ fn parse_uri<T: AsRef<str>>(
             Some(FilterType::StopArea(sa_uri)) => {
                 let opt_idx = model.stop_areas.get_idx(sa_uri);
                 if let Some(idx) = opt_idx {
-                    let set: IdxSet<StopArea> = vec![idx].into_iter().collect();
-                    pt_object_to_sp(model, &set, &mut set_sp_idx);
+                    let mut set_sa = IdxSet::new();
+                    set_sa.insert(idx);
+                    let set_new_sp = set_sa.get_corresponding(model);
+                    set_sp_idx.extend(set_new_sp);
                 }
             }
             Some(FilterType::Line(line)) => {
