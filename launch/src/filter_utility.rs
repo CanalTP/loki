@@ -37,7 +37,7 @@
 use loki::transit_model::objects::{CommercialMode, PhysicalMode};
 use loki::transit_model::{
     model::GetCorresponding,
-    objects::{Line, Network, Route, StopArea, StopPoint, VehicleJourney},
+    objects::{Line, Network, Route, StopPoint, VehicleJourney},
     Model,
 };
 use relational_types::IdxSet;

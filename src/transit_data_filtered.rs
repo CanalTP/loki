@@ -50,14 +50,14 @@ use crate::timetables::generic_timetables::VehicleDataTrait;
 use crate::timetables::{Stop, Timetables as TimetablesTrait, TimetablesIter};
 use crate::transit_data::data_interface::Data;
 use crate::transit_data::{data_interface, iters, StopData, Transfer};
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 #[derive(Default)]
 pub struct DataFilter {
-    pub forbidden_sp_idx: HashSet<Idx<StopPoint>>,
-    pub allowed_sp_idx: HashSet<Idx<StopPoint>>,
-    pub forbidden_vj_idx: HashSet<Idx<VehicleJourney>>,
-    pub allowed_vj_idx: HashSet<Idx<VehicleJourney>>,
+    pub forbidden_sp_idx: FxHashSet<Idx<StopPoint>>,
+    pub allowed_sp_idx: FxHashSet<Idx<StopPoint>>,
+    pub forbidden_vj_idx: FxHashSet<Idx<VehicleJourney>>,
+    pub allowed_vj_idx: FxHashSet<Idx<VehicleJourney>>,
 }
 
 impl DataFilter {
