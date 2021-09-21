@@ -49,7 +49,7 @@ use super::config;
 use crate::loki::{DataTrait, TransitData};
 use loki::request::{self, generic_request::Types};
 use loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
-use loki::transit_data_filtered::TransitDataFiltered;
+use loki::transit_data_filtered::{DataFilter, TransitDataFiltered};
 
 pub struct Solver<Timetables>
 where
@@ -75,6 +75,7 @@ where
         data: &TransitData<Timetables>,
         model: &transit_model::Model,
         request_input: &RequestInput,
+        filters: DataFilter,
         comparator_type: &config::ComparatorType,
         datetime_represent: &DateTimeRepresent,
     ) -> Result<Vec<response::Response>, BadRequest>
@@ -84,12 +85,12 @@ where
         use crate::datetime::DateTimeRepresent::*;
         use config::ComparatorType::*;
 
-        let filtered_request = !request_input.filters.is_empty();
+        let filtered_request = !filters.is_empty();
 
         if filtered_request {
             let data = TransitDataFiltered {
                 transit_data: data,
-                filters: request_input.filters.clone(),
+                filters,
             };
             let responses = match (datetime_represent, comparator_type) {
                 (Arrival, Loads) => {

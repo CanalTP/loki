@@ -424,6 +424,13 @@ where
         &journey_request.forbidden_uris,
         &journey_request.allowed_id,
     );
+    let data_filters = DataFilter {
+        forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
+        allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
+        forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
+        allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
+    };
+
     let request_input = RequestInput {
         datetime: departure_datetime,
         departures_stop_point_and_fallback_duration,
@@ -433,12 +440,6 @@ where
         max_nb_of_legs,
         max_journey_duration,
         too_late_threshold: config.request_default_params.too_late_threshold,
-        filters: DataFilter {
-            forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
-            allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
-            forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
-            allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
-        },
     };
 
     let datetime_represent = match journey_request.clockwise {
@@ -451,6 +452,7 @@ where
         data,
         model,
         &request_input,
+        data_filters,
         &comparator_type,
         &datetime_represent,
     )?;

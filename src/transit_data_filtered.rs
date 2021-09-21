@@ -52,7 +52,7 @@ use crate::transit_data::data_interface::Data;
 use crate::transit_data::{data_interface, iters, StopData, Transfer};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Default)]
 pub struct DataFilter {
     pub forbidden_sp_idx: HashSet<Idx<StopPoint>>,
     pub allowed_sp_idx: HashSet<Idx<StopPoint>>,

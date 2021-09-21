@@ -121,13 +121,11 @@ impl<'a> Config<'a> {
     }
 }
 
-fn make_request_from_config(model: &Model, config: &Config) -> Result<RequestInput, Error> {
+fn make_request_from_config(config: &Config) -> Result<RequestInput, Error> {
     let datetime = config.datetime;
 
     let start_stop_point_uri = &config.start;
     let end_stop_point_uri = &config.end;
-
-    let filters = create_filter_idx(model, &config.forbidden_uri, &config.allowed_uri);
 
     let request_input = RequestInput {
         datetime,
@@ -144,12 +142,6 @@ fn make_request_from_config(model: &Model, config: &Config) -> Result<RequestInp
         max_nb_of_legs: config.request_params.max_nb_of_legs,
         max_journey_duration: config.request_params.max_journey_duration,
         too_late_threshold: config.request_params.too_late_threshold,
-        filters: DataFilter {
-            forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
-            allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
-            forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
-            allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
-        },
     };
     Ok(request_input)
 }
@@ -186,12 +178,21 @@ where
 
     let mut solver = Solver::new(data.nb_of_stops(), data.nb_of_missions());
 
-    let request_input = make_request_from_config(model, config)?;
+    let filters = create_filter_idx(model, &config.forbidden_uri, &config.allowed_uri);
+    let data_filters = DataFilter {
+        forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
+        allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
+        forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
+        allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
+    };
+
+    let request_input = make_request_from_config(config)?;
 
     let responses = solver.solve_request(
         &data,
         model,
         &request_input,
+        data_filters,
         &config.comparator_type,
         &config.datetime_represent,
     )?;

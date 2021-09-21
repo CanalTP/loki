@@ -241,7 +241,6 @@ pub struct RequestInput {
     pub max_nb_of_legs: u8,
     pub max_journey_duration: PositiveDuration,
     pub too_late_threshold: PositiveDuration,
-    pub filters: DataFilter,
 }
 
 pub trait RequestIO<'data, 'model, Data: data_interface::Data>: Request {
@@ -315,7 +314,6 @@ use std::fmt;
 
 use chrono::NaiveDateTime;
 
-use crate::transit_data_filtered::DataFilter;
 use crate::PositiveDuration;
 
 impl fmt::Display for BadRequest {
