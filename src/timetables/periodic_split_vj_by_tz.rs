@@ -297,59 +297,7 @@ impl TimetablesTrait for PeriodicSplitVjByTzTimetables {
         mission: &Self::Mission,
         position: &Self::Position,
     ) -> Option<(Self::Trip, SecondsSinceDatasetUTCStart, Load)> {
-        let has_earliest_and_latest_debark_time =
-            self.timetables.earliest_and_latest_debark_time(position);
-
-        // if there is no earliest/latest debark time, it means that this position cannot be debarked
-        // and we return None
-        let (_earliest_debark_time_in_day, _latest_debark_time_in_day) =
-            has_earliest_and_latest_debark_time?;
-
-        let decompositions = self.calendar.decompositions_utc(time);
-        let mut best_vehicle_day_and_its_departure_time_at_previous_position: Option<(
-            Vehicle,
-            DaysSinceDatasetStart,
-            SecondsSinceDatasetUTCStart,
-            Load,
-        )> = None;
-        for (waiting_day, waiting_time_in_day) in decompositions {
-            let has_vehicle = self.timetables.latest_filtered_vehicle_that_debark(
-                &waiting_time_in_day,
-                mission,
-                position,
-                |vehicle_data| {
-                    let days_pattern = vehicle_data.days_pattern;
-                    self.days_patterns.is_allowed(&days_pattern, &waiting_day)
-                },
-            );
-            if let Some((vehicle, departure_time_in_day_at_previous_stop, load)) = has_vehicle {
-                let departure_time_at_previous_stop = self
-                    .calendar
-                    .compose_utc(&waiting_day, departure_time_in_day_at_previous_stop);
-
-                if let Some((_, _, best_departure_time, best_load)) =
-                    &best_vehicle_day_and_its_departure_time_at_previous_position
-                {
-                    if departure_time_at_previous_stop >= *best_departure_time
-                        || (departure_time_at_previous_stop == *best_departure_time
-                            && load < best_load)
-                    {
-                        best_vehicle_day_and_its_departure_time_at_previous_position =
-                            Some((vehicle, waiting_day, departure_time_at_previous_stop, *load));
-                    }
-                } else {
-                    best_vehicle_day_and_its_departure_time_at_previous_position =
-                        Some((vehicle, waiting_day, departure_time_at_previous_stop, *load));
-                }
-            }
-        }
-
-        best_vehicle_day_and_its_departure_time_at_previous_position.map(
-            |(vehicle, day, departure_time_at_previous_stop, load)| {
-                let trip = Trip { vehicle, day };
-                (trip, departure_time_at_previous_stop, load)
-            },
-        )
+        self.latest_filtered_trip_that_debark_at(time, mission, position, |_: &VehicleData| true)
     }
 
     fn latest_filtered_trip_that_debark_at<Filter>(
@@ -370,13 +318,7 @@ impl TimetablesTrait for PeriodicSplitVjByTzTimetables {
         let (_earliest_debark_time_in_day, _latest_debark_time_in_day) =
             has_earliest_and_latest_debark_time?;
 
-        let decompositions = self.calendar.decompositions_utc(
-            time,
-            SecondsSinceUTCDayStart::max(),
-            SecondsSinceUTCDayStart::min(),
-            // *latest_debark_time_in_day,
-            // *earliest_debark_time_in_day,
-        );
+        let decompositions = self.calendar.decompositions_utc(time);
         let mut best_vehicle_day_and_its_departure_time_at_previous_position: Option<(
             Vehicle,
             DaysSinceDatasetStart,
