@@ -56,9 +56,13 @@ pub struct SecondsSinceUTCDayStart {
     seconds: i32,
 }
 
-const MAX_SECONDS_IN_DAY: i32 = 48 * 60 * 60; // 48h
+const SECONDS_IN_A_DAY: i32 = 24 * 60 * 60; // 24h
 
-const MAX_TIMEZONE_OFFSET: i32 = 24 * 60 * 60; // 24h in seconds
+const MAX_SECONDS_IN_TIMEZONED_DAY: i32 = 2 * SECONDS_IN_A_DAY; // 48h
+
+const MAX_TIMEZONE_OFFSET: i32 = SECONDS_IN_A_DAY; // 24h
+
+const MAX_SECONDS_IN_UTC_DAY: i32 = MAX_SECONDS_IN_TIMEZONED_DAY + MAX_TIMEZONE_OFFSET; // 72h
 
 /// Duration since 00:00:00 UTC in the first allowed day of the data
 /// This is used in the engine to store a point in time in an unambiguous way
@@ -80,7 +84,7 @@ const MAX_DAYS_IN_CALENDAR: u16 = 100 * 366;
 pub struct Calendar {
     first_date: NaiveDate, //first date which may be allowed
     last_date: NaiveDate,  //last date (included) which may be allowed
-    nb_of_days: u16,       // == (last_date - first_date).num_of_days() + 1
+    last_day_offset: u16,  // == (last_date - first_date).num_of_days()
                            // we allow at most MAX_DAYS_IN_CALENDAR days
 }
 
@@ -202,13 +206,13 @@ impl SecondsSinceTimezonedDayStart {
 
     pub fn max() -> Self {
         Self {
-            seconds: MAX_SECONDS_IN_DAY,
+            seconds: MAX_SECONDS_IN_TIMEZONED_DAY,
         }
     }
 
     pub fn min() -> Self {
         Self {
-            seconds: -MAX_SECONDS_IN_DAY,
+            seconds: -MAX_SECONDS_IN_TIMEZONED_DAY,
         }
     }
 
@@ -219,7 +223,7 @@ impl SecondsSinceTimezonedDayStart {
     }
 
     pub fn from_seconds(seconds: i32) -> Option<Self> {
-        if seconds > MAX_SECONDS_IN_DAY || seconds < -MAX_SECONDS_IN_DAY {
+        if seconds > MAX_SECONDS_IN_TIMEZONED_DAY || seconds < -MAX_SECONDS_IN_TIMEZONED_DAY {
             None
         } else {
             let result = Self { seconds };
@@ -228,7 +232,7 @@ impl SecondsSinceTimezonedDayStart {
     }
 
     pub fn from_seconds_i64(seconds_i64: i64) -> Option<Self> {
-        let max_i64 = i64::from(MAX_SECONDS_IN_DAY);
+        let max_i64 = i64::from(MAX_SECONDS_IN_TIMEZONED_DAY);
         if seconds_i64 > max_i64 || seconds_i64 < -max_i64 {
             None
         } else {
@@ -247,13 +251,13 @@ impl SecondsSinceTimezonedDayStart {
 
 impl SecondsSinceUTCDayStart {
     pub fn from_seconds_i64(seconds_i64: i64) -> Option<Self> {
-        let max_i64 = i64::from(MAX_SECONDS_IN_DAY);
+        let max_i64 = i64::from(MAX_SECONDS_IN_UTC_DAY);
         if seconds_i64 > max_i64 || seconds_i64 < -max_i64 {
             None
         } else {
             // since  :
-            //  - seconds_i64 belongs to [-MAX_SECONDS_SINCE_TIMEZONED_DAY_START, MAX_SECONDS_SINCE_TIMEZONED_DAY_START]
-            //  - MAX_SECONDS_SINCE_TIMEZONED_DAY_START <= i32::MAX
+            //  - seconds_i64 belongs to [-MAX_SECONDS_IN_UTC_DAY, MAX_SECONDS_IN_UTC_DAY]
+            //  - MAX_SECONDS_IN_UTC_DAY <= i32::MAX
             // we can safely cas seconds_i64 to i32
             let seconds_i32 = seconds_i64 as i32;
             let result = Self {
@@ -262,15 +266,24 @@ impl SecondsSinceUTCDayStart {
             Some(result)
         }
     }
+
+    fn new_unchecked(seconds_i32: i32) -> Self {
+        debug_assert!(seconds_i32 >= -MAX_SECONDS_IN_UTC_DAY);
+        debug_assert!(seconds_i32 <= MAX_SECONDS_IN_UTC_DAY);
+        Self {
+            seconds: seconds_i32,
+        }
+    }
+
     pub fn max() -> Self {
         Self {
-            seconds: MAX_SECONDS_IN_DAY,
+            seconds: MAX_SECONDS_IN_UTC_DAY,
         }
     }
 
     pub fn min() -> Self {
         Self {
-            seconds: -MAX_SECONDS_IN_DAY,
+            seconds: -MAX_SECONDS_IN_UTC_DAY,
         }
     }
 }

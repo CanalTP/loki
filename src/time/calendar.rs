@@ -34,59 +34,64 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
+use crate::time::SECONDS_IN_A_DAY;
+
 use super::{
     Calendar, DaysSinceDatasetStart, SecondsSinceDatasetUTCStart, SecondsSinceTimezonedDayStart,
-    SecondsSinceUTCDayStart, MAX_DAYS_IN_CALENDAR, MAX_SECONDS_IN_DAY, MAX_TIMEZONE_OFFSET,
+    SecondsSinceUTCDayStart, MAX_DAYS_IN_CALENDAR, MAX_SECONDS_IN_TIMEZONED_DAY,
+    MAX_SECONDS_IN_UTC_DAY, MAX_TIMEZONE_OFFSET,
 };
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{NaiveDate, NaiveDateTime};
 use chrono_tz::Tz as Timezone;
 use std::convert::TryFrom;
 
 impl Calendar {
     pub fn new(first_date: NaiveDate, last_date: NaiveDate) -> Self {
         assert!(first_date <= last_date);
-        let nb_of_days_i64: i64 = (last_date - first_date).num_days() + 1;
+        let last_day_offset_i64: i64 = (last_date - first_date).num_days();
         assert!(
-            nb_of_days_i64 < MAX_DAYS_IN_CALENDAR as i64,
+            last_day_offset_i64 < MAX_DAYS_IN_CALENDAR as i64,
             "Trying to construct a calendar with {:#} days \
             which is more than the maximum allowed of {:#} days",
-            nb_of_days_i64,
+            last_day_offset_i64,
             MAX_DAYS_IN_CALENDAR
         );
 
         // unwrap here is safe because :
-        // - nb_of_days_i64 >=0 since we asserted above that first_date <= last_date
-        // - nb_of_days_i64 < MAX_DAYS_IN_CALENDAR < u16::MAX
-        let nb_of_days: u16 = TryFrom::try_from(nb_of_days_i64).unwrap();
+        // - last_day_offset >=0 since we asserted above that first_date <= last_date
+        // - last_day_offset < MAX_DAYS_IN_CALENDAR < u16::MAX
+        let last_day_offset: u16 = TryFrom::try_from(last_day_offset_i64).unwrap();
 
         Self {
             first_date,
             last_date,
-            nb_of_days,
+            last_day_offset,
         }
     }
 
     pub fn nb_of_days(&self) -> u16 {
-        self.nb_of_days
+        // +1 will not overflow since we ensured that
+        //  last_day_offset < MAX_DAYS_IN_CALENDAR < u16::MAX
+        // in new()
+        self.last_day_offset + 1
     }
 
     pub fn days(&self) -> DaysIter {
+        let nb_of_days = self.nb_of_days();
         DaysIter {
-            inner: 0..self.nb_of_days,
+            inner: 0..nb_of_days,
         }
     }
 
     /// The first datetime that can be obtained
     pub fn first_datetime(&self) -> NaiveDateTime {
-        self.first_date.and_hms(0,0,0)
-            - chrono::Duration::seconds(i64::from(MAX_TIMEZONE_OFFSET)) // in the west-most timezone, we are at UTC-12, with take some margin (day saving times...) and make it -24h
-            - chrono::Duration::seconds(i64::from(MAX_SECONDS_IN_DAY))
+        self.first_date.and_hms(0, 0, 0)
+            - chrono::Duration::seconds(i64::from(MAX_SECONDS_IN_UTC_DAY))
     }
 
     pub fn last_datetime(&self) -> NaiveDateTime {
         self.last_date.and_hms(0, 0, 0)
-        + chrono::Duration::seconds(i64::from(MAX_TIMEZONE_OFFSET)) // in the east-most timezone, we are at UTC+14, with take some margin and make it +24h
-        + chrono::Duration::seconds(i64::from(MAX_SECONDS_IN_DAY))
+            + chrono::Duration::seconds(i64::from(MAX_SECONDS_IN_UTC_DAY))
     }
 
     pub fn contains_datetime(&self, datetime: &NaiveDateTime) -> bool {
@@ -159,22 +164,6 @@ impl Calendar {
         }
     }
 
-    fn decompose_utc(
-        &self,
-        datetime_utc_to_decompose: &chrono::DateTime<Utc>,
-        reference_date: &chrono::Date<Utc>,
-    ) -> Option<(DaysSinceDatasetStart, SecondsSinceUTCDayStart)> {
-        let reference_datetime = reference_date.and_hms(0, 0, 0);
-        let seconds_i64 = (*datetime_utc_to_decompose - reference_datetime).num_seconds();
-
-        let has_seconds = SecondsSinceUTCDayStart::from_seconds_i64(seconds_i64);
-        let has_reference_day = self.date_to_days_since_start(&reference_date.naive_local());
-
-        match (has_reference_day, has_seconds) {
-            (Some(reference_day), Some(seconds)) => Some((reference_day, seconds)),
-            _ => None,
-        }
-    }
     // returns an iterator that provides all decompositions of `second_in_dataset_start`
     // of the form (day, time_in_timezoned_day) such that :
     //  - `day` belongs to the calendar
@@ -209,25 +198,8 @@ impl Calendar {
     pub fn decompositions_utc<'a>(
         &'a self,
         seconds_since_dataset_start: &SecondsSinceDatasetUTCStart,
-        max_seconds_since_timezoned_day_start: SecondsSinceUTCDayStart,
-        min_seconds_since_timezoned_day_start: SecondsSinceUTCDayStart,
     ) -> impl Iterator<Item = (DaysSinceDatasetStart, SecondsSinceUTCDayStart)> + 'a {
-        // will advance the date until `time_in_timezoned_day` becomes smaller than `min_seconds_since_timezoned_day_start`
-        let forward_iter = ForwardDecomposeUtc::new(
-            seconds_since_dataset_start,
-            min_seconds_since_timezoned_day_start,
-            self,
-        );
-        // will decrease the date until `time_in_timezoned_day` becomes greater than `max_seconds_since_timezoned_day_start`
-        let mut backward_iter = BackwardDecomposeUtc::new(
-            seconds_since_dataset_start,
-            max_seconds_since_timezoned_day_start,
-            self,
-        );
-        // we want to skip the first date as it is already provided by `forward_iter`
-        backward_iter.next();
-
-        forward_iter.chain(backward_iter)
+        DecomposeUtc::new(seconds_since_dataset_start, self)
     }
 
     pub fn compose_utc(
@@ -235,26 +207,22 @@ impl Calendar {
         day: &DaysSinceDatasetStart,
         seconds_in_day: &SecondsSinceUTCDayStart,
     ) -> SecondsSinceDatasetUTCStart {
-        debug_assert!(day.days < self.nb_of_days);
-        let date = *self.first_date() + chrono::Duration::days(day.days as i64);
-        // Since DaySinceDatasetStart can only be constructed from the calendar, the date should be allowed by the calendar
-        debug_assert!(self.contains_date(&date));
+        debug_assert!(day.days < self.nb_of_days());
 
-        let datetime =
-            date.and_hms(0, 0, 0) + chrono::Duration::seconds(seconds_in_day.seconds as i64);
-        debug_assert!(self.contains_datetime(&datetime));
+        let seconds_i32 = i32::from(day.days) * SECONDS_IN_A_DAY
+            + seconds_in_day.seconds
+            + MAX_SECONDS_IN_UTC_DAY;
 
-        let seconds_i64 = (datetime - self.first_datetime()).num_seconds();
-        debug_assert!(seconds_i64 >= 0);
-        static_assertions::const_assert!(
-            (MAX_DAYS_IN_CALENDAR as i64) * 24 * 60 * 60
-                + (MAX_SECONDS_IN_DAY as i64)
-                + (MAX_TIMEZONE_OFFSET as i64)
-                <= u32::MAX as i64
-        );
-        debug_assert!(seconds_i64 <= u32::MAX as i64);
+        // seconds_i32 should be >=0 since
+        //  - i32::from(day.days) * SECONDS_PER_DAY >= 0
+        //         since day.days >= 0 and SECONDS_PER_DAY > 0
+        //  - seconds_in_day.seconds + MAX_SECONDS_IN_UTC_DAY >= 0
+        //        since seconds_in_day.seconds >= - MAX_SECONDS_IN_UTC_DAY by construction on SecondsSinceUTCDayStart
+        // which is exactly how first_datetime() is constructed
+        debug_assert!(seconds_i32 >= 0);
 
-        let seconds_u32 = seconds_i64 as u32;
+        let seconds_u32 = seconds_i32 as u32;
+
         SecondsSinceDatasetUTCStart {
             seconds: seconds_u32,
         }
@@ -266,7 +234,7 @@ impl Calendar {
         seconds_in_day: &SecondsSinceTimezonedDayStart,
         timezone: &Timezone,
     ) -> SecondsSinceDatasetUTCStart {
-        debug_assert!(day.days < self.nb_of_days);
+        debug_assert!(day.days < self.nb_of_days());
         let date = *self.first_date() + chrono::Duration::days(day.days as i64);
         // Since DaySinceDatasetStart can only be constructed from the calendar, the date should be allowed by the calendar
         debug_assert!(self.contains_date(&date));
@@ -289,14 +257,14 @@ impl Calendar {
         debug_assert!(seconds_i64 >= 0);
         // seconds_i64 <= u32::MAX since :
         // - day < MAX_DAYS_IN_CALENDAR
-        // - seconds_in_day < MAX_SECONDS_SINCE_TIMEZONED_DAY_START
+        // - seconds_in_day < MAX_SECONDS_IN_TIMEZONED_DAY
         // thus seconds_i64 <=  MAX_DAYS_IN_CALENDAR * 24 * 60 * 60
-        //                     + MAX_SECONDS_SINCE_TIMEZONED_DAY_START
+        //                     + MAX_SECONDS_IN_TIMEZONED_DAY
         //                     + MAX_TIMEZONE_OFFSET
         // and the latter number is smaller than u32::MAX
         static_assertions::const_assert!(
-            (MAX_DAYS_IN_CALENDAR as i64) * 24 * 60 * 60
-                + (MAX_SECONDS_IN_DAY as i64)
+            (MAX_DAYS_IN_CALENDAR as i64) * (SECONDS_IN_A_DAY as i64)
+                + (MAX_SECONDS_IN_TIMEZONED_DAY as i64)
                 + (MAX_TIMEZONE_OFFSET as i64)
                 <= u32::MAX as i64
         );
@@ -323,12 +291,12 @@ impl Calendar {
         // since calendar.contains_datetime(&datetime) and
         // (last_datetime - first_datetime).num_seconds() <=
         //   MAX_DAYS_IN_CALENDAR * 24 * 60 * 60
-        //    + MAX_SECONDS_SINCE_TIMEZONED_DAY_START
+        //    + MAX_SECONDS_IN_TIMEZONED_DAY
         //    + MAX_TIMEZONE_OFFSET
         // and the latter number is smaller than u32::MAX
         static_assertions::const_assert!(
-            (MAX_DAYS_IN_CALENDAR as i64) * 24 * 60 * 60
-                + (MAX_SECONDS_IN_DAY as i64)
+            (MAX_DAYS_IN_CALENDAR as i64) * (SECONDS_IN_A_DAY as i64)
+                + (MAX_SECONDS_IN_TIMEZONED_DAY as i64)
                 + (MAX_TIMEZONE_OFFSET as i64)
                 <= u32::MAX as i64
         );
@@ -339,6 +307,11 @@ impl Calendar {
             seconds: seconds_u32,
         };
         Some(result)
+    }
+
+    fn make_day_unchecked(&self, days_offset: u16) -> DaysSinceDatasetStart {
+        debug_assert!(days_offset < self.nb_of_days());
+        DaysSinceDatasetStart { days: days_offset }
     }
 }
 
@@ -407,49 +380,140 @@ impl<'calendar> Iterator for ForwardDecompose<'calendar> {
     }
 }
 
-pub struct ForwardDecomposeUtc<'calendar> {
-    datetime_utc_to_decompose: DateTime<chrono::Utc>,
-    has_reference_date_utc: Option<chrono::Date<Utc>>,
-    min_seconds_since_timezoned_day_start: SecondsSinceUTCDayStart,
+pub struct DecomposeUtc<'calendar> {
+    canonical_day: i32,
+    canonical_time_in_day: i32,
+    iter: std::ops::Range<i32>,
+    // not really useful, but allows debug_asserting  that this iterator
+    // does not create a DaySinceDatasetStart outside of the range allowed by the calendar
     calendar: &'calendar Calendar,
 }
 
-impl<'calendar> ForwardDecomposeUtc<'calendar> {
+impl<'calendar> DecomposeUtc<'calendar> {
     fn new(
         seconds_since_dataset_start: &SecondsSinceDatasetUTCStart,
-        min_seconds_since_timezoned_day_start: SecondsSinceUTCDayStart,
         calendar: &'calendar Calendar,
     ) -> Self {
-        let datetime_utc = calendar.first_datetime()
-            + chrono::Duration::seconds(i64::from(seconds_since_dataset_start.seconds));
-        debug_assert!(calendar.contains_datetime(&datetime_utc));
+        // 0
+        //
+        // [------------|----|----| ... |----|----|------------]
+        //
 
-        let datetime_utc = DateTime::<Utc>::from_utc(datetime_utc, Utc);
-        let date_utc = datetime_utc.date();
+        let first_day_at_midnight_i64 = i64::from(MAX_SECONDS_IN_UTC_DAY);
+        let last_day_at_midnight_i64 = first_day_at_midnight_i64
+            + i64::from(calendar.last_day_offset) * i64::from(SECONDS_IN_A_DAY);
+        let (canonical_day, canonical_time_in_day): (u16, i32) = {
+            let datetime_i64 = i64::from(seconds_since_dataset_start.seconds);
+            if datetime_i64 <= first_day_at_midnight_i64 {
+                let day = 0u16;
+                let time_in_day_i64 = datetime_i64 - first_day_at_midnight_i64;
+                // cast to i32 is safe because :
+                //   * time_in_day_i64 <= 0 since
+                //         datetime_i64 <= first_day_at_midnight_i64
+                //   * time_in_day_i64 >= - first_day_at_midnight_i64 >= - i32::MAX since
+                //        datetime_i64 >=0
+                let time_in_day_i32 = time_in_day_i64 as i32;
+                (day, time_in_day_i32)
+            } else if datetime_i64 >= last_day_at_midnight_i64 {
+                let day = calendar.last_day_offset;
+                let time_in_day_i64 = datetime_i64 - last_day_at_midnight_i64;
+                // cast to i32 is safe because :
+                //   * time_in_day_i64 <= SECONDS_IN_UTC_DAY < i32::MAX since
+                //         datetime_i64 <= last_day_at_midnight_i64 + SECONDS_IN_UTC_DAY
+                //         by construction of SecondsSinceDatasetUTCStart
+                //   * time_in_day_i64 >= 0 since
+                //         datetime_i64 >= last_day_at_midnight_i64
+                let time_in_day_i32 = time_in_day_i64 as i32;
+                (day, time_in_day_i32)
+            } else {
+                // first_day_at_midnight_i64 < datetime_i64 < last_day_at_midnight_i64
+                let day_i64 =
+                    (datetime_i64 - first_day_at_midnight_i64) / i64::from(SECONDS_IN_A_DAY);
+                let time_in_day_i64 =
+                    (datetime_i64 - first_day_at_midnight_i64) % i64::from(SECONDS_IN_A_DAY);
+
+                // cast to u16 is safe because
+                //  * day_i64 >= 0 since
+                //          datetime_i64 - first_day_at_midnight_i64 >= 0
+                //  * day_i64 <= calendar.last_day_offset < MAX_DAYS_IN_CALENDAR < u16::MAX since
+                //          (datetime_i64 - first_day_at_midnight_i64) <= (last_day_at_midnight_i64 - first_day_at_midnight_i64)
+                //                                                     <= calendar.last_day_offset * SECONDS_IN_A_DAY
+                let day = day_i64 as u16;
+
+                // cast to i32 is safe because
+                //  |time_in_day_i64| <= SECONDS_IN_A_DAY <= i32::MAX
+                let time_in_day_i32 = time_in_day_i64 as i32;
+                (day, time_in_day_i32)
+            }
+        };
+
+        // we are going to generate pairs
+        // (canonical_day + k, canonical_time_in_day - k * SECONDS_IN_A_DAY)
+        // where k covers all integers such that
+        //   0 <= canonical_day + k <= calendar.last_day_offset
+        //   - MAX_SECONDS_IN_UTC_DAY <= canonical_time_in_day - k * SECONDS_IN_A_DAY <= MAX_SECONDS_IN_UTC_DAY
+        // so k must satisfies
+        //   k >= - canonical_day
+        //   k >= (canonical_time_in_day - MAX_SECONDS_IN_UTC_DAY) / SECONDS_IN_A_DAY
+        // and
+        //   k <= calendar.last_day_offset - canonical_day
+        //   k <= (canonical_time_in_day + MAX_SECONDS_IN_UTC_DAY) / SECONDS_IN_A_DAY
+
+        let canonical_day_i32 = i32::from(canonical_day);
+
+        let k_lower_bound_from_time_in_day = {
+            let div = (canonical_time_in_day - MAX_SECONDS_IN_UTC_DAY) / SECONDS_IN_A_DAY;
+            let rem = (canonical_time_in_day - MAX_SECONDS_IN_UTC_DAY) % SECONDS_IN_A_DAY;
+            if rem > 0 {
+                div + 1
+            } else {
+                div
+            }
+        };
+
+        let k_min = std::cmp::max(-canonical_day_i32, k_lower_bound_from_time_in_day);
+
+        let k_upper_bound_from_time_in_day = {
+            let div = (canonical_time_in_day + MAX_SECONDS_IN_UTC_DAY) / SECONDS_IN_A_DAY;
+            let rem = (canonical_time_in_day + MAX_SECONDS_IN_UTC_DAY) % SECONDS_IN_A_DAY;
+            if rem < 0 {
+                div - 1
+            } else {
+                div
+            }
+        };
+
+        let k_max = std::cmp::min(
+            i32::from(calendar.last_day_offset) - canonical_day_i32,
+            k_upper_bound_from_time_in_day,
+        );
+
         Self {
-            datetime_utc_to_decompose: datetime_utc,
-            has_reference_date_utc: Some(date_utc),
-            min_seconds_since_timezoned_day_start,
+            canonical_day: canonical_day_i32,
+            canonical_time_in_day,
+            iter: k_min..(k_max + 1),
             calendar,
         }
     }
 }
 
-impl<'calendar> Iterator for ForwardDecomposeUtc<'calendar> {
+impl<'calendar> Iterator for DecomposeUtc<'calendar> {
     type Item = (DaysSinceDatasetStart, SecondsSinceUTCDayStart);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(ref reference_date) = self.has_reference_date_utc {
-            let has_decomposition = self
-                .calendar
-                .decompose_utc(&self.datetime_utc_to_decompose, reference_date);
-            if let Some((day, seconds)) = has_decomposition {
-                if seconds >= self.min_seconds_since_timezoned_day_start {
-                    self.has_reference_date_utc = reference_date.succ_opt();
-                    return Some((day, seconds));
-                }
-            }
-        }
-        None
+        self.iter.next().map(|k| {
+            let day_i32 = self.canonical_day + k;
+
+            // here we make unsafe things, but everything
+            // is safe because we were extra careful in Self::new()
+
+            let day_u16 = day_i32 as u16;
+            let day = self.calendar.make_day_unchecked(day_u16);
+
+            let time_in_day = SecondsSinceUTCDayStart::new_unchecked(
+                self.canonical_time_in_day - SECONDS_IN_A_DAY * k,
+            );
+            (day, time_in_day)
+        })
     }
 }
 
@@ -504,49 +568,141 @@ impl<'calendar> Iterator for BackwardDecompose<'calendar> {
     }
 }
 
-pub struct BackwardDecomposeUtc<'calendar> {
-    datetime_utc_to_decompose: chrono::DateTime<Utc>,
-    has_reference_date: Option<chrono::Date<Utc>>,
-    max_seconds_since_timezoned_day_start: SecondsSinceUTCDayStart,
-    calendar: &'calendar Calendar,
-}
+#[cfg(test)]
+mod tests {
 
-impl<'calendar> BackwardDecomposeUtc<'calendar> {
-    fn new(
-        seconds_since_dataset_start: &SecondsSinceDatasetUTCStart,
-        max_seconds_since_timezoned_day_start: SecondsSinceUTCDayStart,
-        calendar: &'calendar Calendar,
-    ) -> Self {
-        let datetime_utc = calendar.first_datetime()
-            + chrono::Duration::seconds(i64::from(seconds_since_dataset_start.seconds));
+    use chrono::NaiveDate;
 
-        debug_assert!(calendar.contains_datetime(&datetime_utc));
+    const SECONDS_PER_HOUR: i32 = 60 * 60;
 
-        let datetime_utc = DateTime::<Utc>::from_utc(datetime_utc, Utc);
-        let date_utc = datetime_utc.date();
-        Self {
-            datetime_utc_to_decompose: datetime_utc,
-            has_reference_date: Some(date_utc),
-            max_seconds_since_timezoned_day_start,
-            calendar,
+    use super::Calendar;
+    #[test]
+    fn test_decompositions_utc() {
+        let calendar = Calendar::new(
+            NaiveDate::from_ymd(2020, 1, 1),
+            NaiveDate::from_ymd(2020, 1, 30),
+        );
+
+        {
+            // Jan 1st at 12:00
+            let datetime = NaiveDate::from_ymd(2020, 1, 1).and_hms(12, 0, 0);
+            let seconds_since_dataset_start = calendar.from_naive_datetime(&datetime).unwrap();
+
+            let decompositions: Vec<_> = calendar
+                .decompositions_utc(&seconds_since_dataset_start)
+                .collect();
+
+            // Jan 1st + 12h
+            assert_eq!(decompositions[0].0.days, 0);
+            assert_eq!(decompositions[0].1.seconds, 12 * SECONDS_PER_HOUR);
+
+            // Jan 2nd - 12h
+            assert_eq!(decompositions[1].0.days, 1);
+            assert_eq!(decompositions[1].1.seconds, -12 * SECONDS_PER_HOUR);
+
+            // Jan 3rd - 36h
+            assert_eq!(decompositions[2].0.days, 2);
+            assert_eq!(decompositions[2].1.seconds, -36 * SECONDS_PER_HOUR);
+
+            // Jan 4th - 60h
+            assert_eq!(decompositions[3].0.days, 3);
+            assert_eq!(decompositions[3].1.seconds, -60 * SECONDS_PER_HOUR);
+
+            assert_eq!(decompositions.len(), 4);
         }
-    }
-}
 
-impl<'calendar> Iterator for BackwardDecomposeUtc<'calendar> {
-    type Item = (DaysSinceDatasetStart, SecondsSinceUTCDayStart);
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(ref reference_date) = self.has_reference_date {
-            let has_decomposition = self
-                .calendar
-                .decompose_utc(&self.datetime_utc_to_decompose, reference_date);
-            if let Some((day, seconds)) = has_decomposition {
-                if seconds <= self.max_seconds_since_timezoned_day_start {
-                    self.has_reference_date = reference_date.pred_opt();
-                    return Some((day, seconds));
-                }
-            }
+        {
+            // Jan 10st at 12:00
+            let datetime = NaiveDate::from_ymd(2020, 1, 10).and_hms(12, 0, 0);
+            let seconds_since_dataset_start = calendar.from_naive_datetime(&datetime).unwrap();
+
+            let decompositions: Vec<_> = calendar
+                .decompositions_utc(&seconds_since_dataset_start)
+                .collect();
+
+            // Jan 8 at +48h + 12h
+            assert_eq!(decompositions[0].0.days, 7);
+            assert_eq!(decompositions[0].1.seconds, (48 + 12) * SECONDS_PER_HOUR);
+
+            // Jan 9 at +24h +12h
+            assert_eq!(decompositions[1].0.days, 8);
+            assert_eq!(decompositions[1].1.seconds, (24 + 12) * SECONDS_PER_HOUR);
+
+            // Jan 10 at +12h
+            assert_eq!(decompositions[2].0.days, 9);
+            assert_eq!(decompositions[2].1.seconds, 12 * SECONDS_PER_HOUR);
+
+            // Jan 11 at -12h
+            assert_eq!(decompositions[3].0.days, 10);
+            assert_eq!(decompositions[3].1.seconds, -12 * SECONDS_PER_HOUR);
+
+            // Jan 12 at -24h -12h
+            assert_eq!(decompositions[4].0.days, 11);
+            assert_eq!(decompositions[4].1.seconds, (-24 - 12) * SECONDS_PER_HOUR);
+
+            // Jan 13 at -48h -12h
+            assert_eq!(decompositions[5].0.days, 12);
+            assert_eq!(decompositions[5].1.seconds, (-48 - 12) * SECONDS_PER_HOUR);
+
+            assert_eq!(decompositions.len(), 6);
         }
-        None
+
+        {
+            // Jan 30st at 12:00
+            let datetime = NaiveDate::from_ymd(2020, 1, 30).and_hms(12, 0, 0);
+            let seconds_since_dataset_start = calendar.from_naive_datetime(&datetime).unwrap();
+
+            let decompositions: Vec<_> = calendar
+                .decompositions_utc(&seconds_since_dataset_start)
+                .collect();
+
+            // Jan 28 at +48h + 12h
+            assert_eq!(decompositions[0].0.days, 27);
+            assert_eq!(decompositions[0].1.seconds, (48 + 12) * SECONDS_PER_HOUR);
+
+            // Jan 29 at +24h +12h
+            assert_eq!(decompositions[1].0.days, 28);
+            assert_eq!(decompositions[1].1.seconds, (24 + 12) * SECONDS_PER_HOUR);
+
+            // Jan 30 at +12h
+            assert_eq!(decompositions[2].0.days, 29);
+            assert_eq!(decompositions[2].1.seconds, 12 * SECONDS_PER_HOUR);
+
+            assert_eq!(decompositions.len(), 3);
+        }
+
+        {
+            // Jan 31st at 12:00
+            let datetime = NaiveDate::from_ymd(2020, 1, 31).and_hms(12, 0, 0);
+            let seconds_since_dataset_start = calendar.from_naive_datetime(&datetime).unwrap();
+
+            let decompositions: Vec<_> = calendar
+                .decompositions_utc(&seconds_since_dataset_start)
+                .collect();
+
+            // Jan 28 at +48h + 12h
+            assert_eq!(decompositions[0].0.days, 28);
+            assert_eq!(decompositions[0].1.seconds, (48 + 12) * SECONDS_PER_HOUR);
+
+            // Jan 30 at +24h +12h
+            assert_eq!(decompositions[1].0.days, 29);
+            assert_eq!(decompositions[1].1.seconds, (24 + 12) * SECONDS_PER_HOUR);
+
+            assert_eq!(decompositions.len(), 2);
+        }
+
+        {
+            // Dec 31st at 12:00
+            let datetime = NaiveDate::from_ymd(2019, 12, 31).and_hms(12, 0, 0);
+            let seconds_since_dataset_start = calendar.from_naive_datetime(&datetime).unwrap();
+
+            let decompositions: Vec<_> = calendar
+                .decompositions_utc(&seconds_since_dataset_start)
+                .collect();
+
+            // Jan 1st - 12h
+            assert_eq!(decompositions[0].0.days, 0);
+            assert_eq!(decompositions[0].1.seconds, -12 * SECONDS_PER_HOUR);
+        }
     }
 }
