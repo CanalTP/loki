@@ -48,7 +48,7 @@ use launch::loki::transit_data_filtered::DataFilter;
 use launch::loki::{response, Idx, RequestInput, StopPoint};
 use launch::solver::Solver;
 use loki::chrono::TimeZone;
-use loki::log::debug;
+use loki::tracing::debug;
 use loki::transit_model::Model;
 use loki::{chrono_tz, TransitData};
 use loki::{DailyData, NaiveDateTime, PeriodicData, PeriodicSplitVjData};

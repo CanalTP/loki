@@ -49,7 +49,7 @@ use transit_model::{
 };
 use typed_index_collection::Idx;
 
-use log::{info, warn};
+use tracing::{info, warn};
 
 use super::{Transfer, TransferData, TransferDurations};
 

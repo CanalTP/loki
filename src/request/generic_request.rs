@@ -46,8 +46,8 @@ use crate::{
 use crate::engine::engine_interface::BadRequest;
 use crate::transit_data::data_interface::Data as DataTrait;
 use chrono::NaiveDateTime;
-use log::warn;
 use std::fmt::Debug;
+use tracing::warn;
 use transit_model::objects::StopPoint;
 use transit_model::Model;
 

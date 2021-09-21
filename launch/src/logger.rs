@@ -1,22 +1,23 @@
-use slog::slog_o;
-use slog::Drain;
-use slog_async::OverflowStrategy;
+use crate::loki::tracing::level_filters::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
 
-pub fn init_logger() -> slog_scope::GlobalLoggerGuard {
-    let decorator = slog_term::TermDecorator::new().stdout().build();
-    let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-    let mut builder = slog_envlogger::LogBuilder::new(drain).filter(None, slog::FilterLevel::Info);
-    if let Ok(s) = std::env::var("RUST_LOG") {
-        builder = builder.parse(&s);
-    }
-    let drain = slog_async::Async::new(builder.build())
-        .chan_size(256) // Double the default size
-        .overflow_strategy(OverflowStrategy::Block)
-        .build()
-        .fuse();
-    let logger = slog::Logger::root(drain, slog_o!());
-
-    let scope_guard = slog_scope::set_global_logger(logger);
-    slog_stdlog::init().unwrap();
-    scope_guard
+pub fn init_logger() {
+    let default_level = LevelFilter::INFO;
+    let rust_log =
+        std::env::var(EnvFilter::DEFAULT_ENV).unwrap_or_else(|_| default_level.to_string());
+    let env_filter_subscriber = EnvFilter::try_new(rust_log).unwrap_or_else(|err| {
+        eprintln!(
+            "invalid {}, falling back to level '{}' - {}",
+            EnvFilter::DEFAULT_ENV,
+            default_level,
+            err,
+        );
+        EnvFilter::new(default_level.to_string())
+    });
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(env_filter_subscriber)
+        .init();
 }

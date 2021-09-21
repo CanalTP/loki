@@ -46,8 +46,8 @@ use launch::loki::{self, TransitData};
 use launch::solver::Solver;
 use loki::transit_data_filtered::DataFilter;
 
-use loki::log::{debug, error, info, warn};
 use loki::timetables::{Timetables as TimetablesTrait, TimetablesIter};
+use loki::tracing::{debug, error, info, warn};
 use loki::transit_model;
 use loki::RequestInput;
 use loki::{DailyData, PeriodicData, PeriodicSplitVjData, PositiveDuration};

@@ -36,7 +36,7 @@
 
 use std::{fmt::Debug, time::SystemTime};
 
-use loki::log::{debug, info, trace};
+use loki::tracing::{debug, info, trace};
 
 use loki::{
     response, transit_model, BadRequest, MultiCriteriaRaptor, RequestDebug, RequestIO,

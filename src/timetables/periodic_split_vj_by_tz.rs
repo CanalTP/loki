@@ -55,7 +55,7 @@ use crate::timetables::{
     FlowDirection, Stop, Timetables as TimetablesTrait, Types as TimetablesTypes,
 };
 
-use crate::log::warn;
+use crate::tracing::warn;
 #[derive(Debug)]
 pub struct PeriodicSplitVjByTzTimetables {
     timetables: Timetables<SecondsSinceUTCDayStart, Load, (), VehicleData>,

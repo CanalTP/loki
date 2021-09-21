@@ -35,11 +35,11 @@
 // www.navitia.io
 
 use chrono::NaiveDate;
-use log::{debug, trace};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Display;
 use std::path::Path;
+use tracing::{debug, trace};
 use transit_model::objects::VehicleJourney;
 use transit_model::Model;
 use typed_index_collection::Idx;

@@ -40,7 +40,6 @@ use super::{
     FlowDirection, Stop, TimetablesIter,
 };
 use crate::loads_data::Load;
-use crate::log::{trace, warn};
 use crate::{
     loads_data::LoadsData,
     time::{
@@ -53,6 +52,8 @@ use crate::{
     transit_data::{Idx, VehicleJourney},
 };
 use chrono::NaiveDate;
+use tracing::{trace, warn};
+
 use core::cmp;
 pub type Time = SecondsSinceDatasetUTCStart;
 

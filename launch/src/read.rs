@@ -37,8 +37,8 @@
 use super::config;
 use crate::loki::timetables::TimetablesIter;
 use crate::loki::TransitData;
-use loki::log::{info, warn};
 use loki::timetables::Timetables as TimetablesTrait;
+use loki::tracing::{info, warn};
 use loki::transit_model::{self, Model};
 use loki::LoadsData;
 use loki::{DataIO, DataTrait, PositiveDuration};

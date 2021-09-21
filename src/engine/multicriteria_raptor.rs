@@ -39,7 +39,7 @@ use std::fmt::Debug;
 use crate::engine::engine_interface::{Journey, RequestDebug, RequestTypes, RequestWithIters};
 use crate::engine::journeys_tree::JourneysTree;
 use crate::engine::pareto_front::{ArriveFront, BoardFront, DebarkFront, WaitFront};
-use log::trace;
+use tracing::trace;
 
 pub struct MultiCriteriaRaptor<T: RequestTypes> {
     journeys_tree: JourneysTree<T>,
