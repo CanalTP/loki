@@ -47,6 +47,7 @@ pub mod transit_data_filtered;
 pub use chrono;
 pub use chrono::NaiveDateTime;
 pub use chrono_tz;
+pub use rustc_hash;
 pub use time::PositiveDuration;
 pub use tracing;
 pub use transit_model;

@@ -424,11 +424,14 @@ where
         &journey_request.forbidden_uris,
         &journey_request.allowed_id,
     );
+
     let data_filters = DataFilter {
         forbidden_sp_idx: filters.forbidden_sp_idx.into_iter().collect(),
         allowed_sp_idx: filters.allowed_sp_idx.into_iter().collect(),
         forbidden_vj_idx: filters.forbidden_vj_idx.into_iter().collect(),
         allowed_vj_idx: filters.allowed_vj_idx.into_iter().collect(),
+        forbidden_pt_idx: filters.forbidden_pt_idx.into_iter().collect(),
+        allowed_pt_idx: filters.allowed_pt_idx.into_iter().collect(),
     };
 
     let request_input = RequestInput {

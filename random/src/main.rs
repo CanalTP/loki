@@ -15,8 +15,10 @@ use failure::{bail, Error};
 
 use launch::datetime::DateTimeRepresent;
 use launch::loki::transit_data_filtered::DataFilter;
+use launch::loki::transit_data_filtered::FilterPtObject::PhysicalMode;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::iter::FromIterator;
 use structopt::StructOpt;
 
 fn main() {
@@ -193,7 +195,12 @@ where
         let start_stop_area_uri = &model.stop_areas.values().choose(&mut rng).unwrap().id;
         let end_stop_area_uri = &model.stop_areas.values().choose(&mut rng).unwrap().id;
 
-        let data_filters = DataFilter::default();
+        use loki::rustc_hash::FxHashSet;
+
+        let data_filters = DataFilter {
+            forbidden_pt_idx: FxHashSet::from_iter([PhysicalMode("Train")]),
+            ..Default::default()
+        };
 
         let request_input = launch::stop_areas::make_query_stop_areas(
             model,

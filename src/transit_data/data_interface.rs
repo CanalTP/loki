@@ -108,6 +108,7 @@ pub trait Data: TransitTypes {
 
     fn earliest_trip_to_board_at(
         &self,
+        model: &Model,
         waiting_time: &SecondsSinceDatasetUTCStart,
         mission: &Self::Mission,
         position: &Self::Position,
@@ -115,6 +116,7 @@ pub trait Data: TransitTypes {
 
     fn latest_trip_that_debark_at(
         &self,
+        model: &Model,
         waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
         mission: &Self::Mission,
         position: &Self::Position,

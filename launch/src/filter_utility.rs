@@ -34,6 +34,8 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
+use crate::loki::transit_data_filtered::FilterPtObject;
+use loki::rustc_hash::FxHashSet;
 use loki::transit_model::objects::{CommercialMode, PhysicalMode};
 use loki::transit_model::{
     model::GetCorresponding,
@@ -41,63 +43,101 @@ use loki::transit_model::{
     Model,
 };
 use relational_types::IdxSet;
+use std::iter::FromIterator;
 
-#[derive(Debug)]
-pub enum FilterType<'a> {
-    StopPoint(&'a str),
-    StopArea(&'a str),
-    Line(&'a str),
-    Route(&'a str),
-    Network(&'a str),
-    PhysicalMode(&'a str),
-    CommercialMode(&'a str),
-}
-
-pub struct Filters {
+pub struct Filters<'a> {
     pub forbidden_sp_idx: IdxSet<StopPoint>,
     pub allowed_sp_idx: IdxSet<StopPoint>,
     pub forbidden_vj_idx: IdxSet<VehicleJourney>,
     pub allowed_vj_idx: IdxSet<VehicleJourney>,
+    pub forbidden_pt_idx: FxHashSet<FilterPtObject<'a>>,
+    pub allowed_pt_idx: FxHashSet<FilterPtObject<'a>>,
 }
 
-fn parse_filter<T: AsRef<str>>(input: &T) -> Option<FilterType> {
+fn parse_filter<T: AsRef<str>>(input: &T) -> Option<FilterPtObject> {
     if let Some(stop_point) = input.as_ref().strip_prefix("stop_point:") {
-        return Some(FilterType::StopPoint(stop_point));
+        return Some(FilterPtObject::StopPoint(stop_point));
     }
     if let Some(stop_area) = input.as_ref().strip_prefix("stop_area:") {
-        return Some(FilterType::StopArea(stop_area));
+        return Some(FilterPtObject::StopArea(stop_area));
     }
     if let Some(line) = input.as_ref().strip_prefix("line:") {
-        return Some(FilterType::Line(line));
+        return Some(FilterPtObject::Line(line));
     }
     if let Some(route) = input.as_ref().strip_prefix("route:") {
-        return Some(FilterType::Route(route));
+        return Some(FilterPtObject::Route(route));
     }
     if let Some(network) = input.as_ref().strip_prefix("network:") {
-        return Some(FilterType::Network(network));
+        return Some(FilterPtObject::Network(network));
     }
     if let Some(physical_mode) = input.as_ref().strip_prefix("physical_mode:") {
-        return Some(FilterType::PhysicalMode(physical_mode));
+        return Some(FilterPtObject::PhysicalMode(physical_mode));
     }
     if let Some(commercial_mode) = input.as_ref().strip_prefix("commercial_mode:") {
-        return Some(FilterType::CommercialMode(commercial_mode));
+        return Some(FilterPtObject::CommercialMode(commercial_mode));
     }
     None
 }
 
-pub fn create_filter_idx<T: AsRef<str>>(
+pub fn create_filter_idx<'a, T: AsRef<str>>(
     model: &Model,
-    forbidden_uri: &[T],
-    allowed_uri: &[T],
-) -> Filters {
-    let (forbidden_sp_idx, forbidden_vj_idx) = parse_uri(model, forbidden_uri);
-    let (allowed_sp_idx, allowed_vj_idx) = parse_uri(model, allowed_uri);
+    forbidden_uri: &'a [T],
+    allowed_uri: &'a [T],
+) -> Filters<'a> {
+    // let (forbidden_sp_idx, forbidden_vj_idx) = parse_uri(model, forbidden_uri);
+    // let (allowed_sp_idx, allowed_vj_idx) = parse_uri(model, allowed_uri);
+
+    let mut forbidden_pt_idx: FxHashSet<FilterPtObject> = FxHashSet::default();
+    let mut allowed_pt_idx: FxHashSet<FilterPtObject> = FxHashSet::default();
+
+    for str in forbidden_uri {
+        let parsed_str = parse_filter(str);
+        match parsed_str {
+            Some(FilterPtObject::StopPoint(_)) | Some(FilterPtObject::StopArea(_)) => (),
+            Some(FilterPtObject::PhysicalMode(id)) => {
+                // pattern bindings after an `@` are unstable
+                if model.physical_modes.contains_id(id) {
+                    forbidden_pt_idx.insert(parsed_str.unwrap());
+                }
+            }
+            Some(FilterPtObject::CommercialMode(id)) => {
+                // pattern bindings after an `@` are unstable
+                if model.commercial_modes.contains_id(id) {
+                    forbidden_pt_idx.insert(parsed_str.unwrap());
+                }
+            }
+            Some(FilterPtObject::Route(id)) => {
+                // pattern bindings after an `@` are unstable
+                if model.routes.contains_id(id) {
+                    forbidden_pt_idx.insert(parsed_str.unwrap());
+                }
+            }
+            Some(FilterPtObject::Line(id)) => {
+                // pattern bindings after an `@` are unstable
+                if model.lines.contains_id(id) {
+                    forbidden_pt_idx.insert(parsed_str.unwrap());
+                }
+            }
+            Some(FilterPtObject::Network(id)) => {
+                // pattern bindings after an `@` are unstable
+                if model.networks.contains_id(id) {
+                    forbidden_pt_idx.insert(parsed_str.unwrap());
+                }
+            }
+            _ => (),
+        }
+    }
+
+    use loki::tracing::info;
+    info!("size : {}", forbidden_pt_idx.len());
 
     Filters {
-        forbidden_sp_idx,
-        allowed_sp_idx,
-        forbidden_vj_idx,
-        allowed_vj_idx,
+        forbidden_sp_idx: IdxSet::default(),
+        allowed_sp_idx: IdxSet::default(),
+        forbidden_vj_idx: IdxSet::default(),
+        allowed_vj_idx: IdxSet::default(),
+        forbidden_pt_idx,
+        allowed_pt_idx,
     }
 }
 
@@ -122,53 +162,52 @@ fn parse_uri<T: AsRef<str>>(
     for str in uris {
         let parsed_str = parse_filter(str);
         match parsed_str {
-            Some(FilterType::StopPoint(sp)) => {
+            Some(FilterPtObject::StopPoint(sp)) => {
                 let sp_idx = model.stop_points.get_idx(sp);
                 if let Some(idx) = sp_idx {
                     set_sp_idx.insert(idx);
                 }
             }
-            Some(FilterType::StopArea(sa_uri)) => {
+            Some(FilterPtObject::StopArea(sa_uri)) => {
                 let opt_idx = model.stop_areas.get_idx(sa_uri);
                 if let Some(idx) = opt_idx {
-                    let mut set_sa = IdxSet::new();
-                    set_sa.insert(idx);
+                    let set_sa = IdxSet::from_iter([idx]);
                     let set_new_sp = set_sa.get_corresponding(model);
                     set_sp_idx.extend(set_new_sp);
                 }
             }
-            Some(FilterType::Line(line)) => {
+            Some(FilterPtObject::Line(line)) => {
                 let line_idx = model.lines.get_idx(line);
                 if let Some(idx) = line_idx {
-                    let set: IdxSet<Line> = vec![idx].into_iter().collect();
+                    let set: IdxSet<Line> = IdxSet::from_iter([idx]);
                     pt_object_to_vj(model, &set, &mut set_vj_idx);
                 }
             }
-            Some(FilterType::Route(route)) => {
+            Some(FilterPtObject::Route(route)) => {
                 let route_idx = model.routes.get_idx(route);
                 if let Some(idx) = route_idx {
-                    let set: IdxSet<Route> = vec![idx].into_iter().collect();
+                    let set: IdxSet<Route> = IdxSet::from_iter([idx]);
                     pt_object_to_vj(model, &set, &mut set_vj_idx);
                 }
             }
-            Some(FilterType::Network(network)) => {
+            Some(FilterPtObject::Network(network)) => {
                 let network_idx = model.networks.get_idx(network);
                 if let Some(idx) = network_idx {
-                    let set: IdxSet<Network> = vec![idx].into_iter().collect();
+                    let set: IdxSet<Network> = IdxSet::from_iter([idx]);
                     pt_object_to_vj(model, &set, &mut set_vj_idx);
                 }
             }
-            Some(FilterType::PhysicalMode(physical_mode)) => {
+            Some(FilterPtObject::PhysicalMode(physical_mode)) => {
                 let physical_mode_idx = model.physical_modes.get_idx(physical_mode);
                 if let Some(idx) = physical_mode_idx {
-                    let set: IdxSet<PhysicalMode> = vec![idx].into_iter().collect();
+                    let set: IdxSet<PhysicalMode> = IdxSet::from_iter([idx]);
                     pt_object_to_vj(model, &set, &mut set_vj_idx);
                 }
             }
-            Some(FilterType::CommercialMode(commercial_mode)) => {
+            Some(FilterPtObject::CommercialMode(commercial_mode)) => {
                 let commercial_mode_idx = model.commercial_modes.get_idx(commercial_mode);
                 if let Some(idx) = commercial_mode_idx {
-                    let set: IdxSet<CommercialMode> = vec![idx].into_iter().collect();
+                    let set: IdxSet<CommercialMode> = IdxSet::from_iter([idx]);
                     pt_object_to_vj(model, &set, &mut set_vj_idx);
                 }
             }

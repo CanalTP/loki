@@ -50,22 +50,39 @@ use crate::timetables::generic_timetables::VehicleDataTrait;
 use crate::timetables::{Stop, Timetables as TimetablesTrait, TimetablesIter};
 use crate::transit_data::data_interface::Data;
 use crate::transit_data::{data_interface, iters, StopData, Transfer};
+use crate::transit_model::Model;
 use rustc_hash::FxHashSet;
 
 #[derive(Default)]
-pub struct DataFilter {
+pub struct DataFilter<'a> {
     pub forbidden_sp_idx: FxHashSet<Idx<StopPoint>>,
     pub allowed_sp_idx: FxHashSet<Idx<StopPoint>>,
     pub forbidden_vj_idx: FxHashSet<Idx<VehicleJourney>>,
     pub allowed_vj_idx: FxHashSet<Idx<VehicleJourney>>,
+
+    pub forbidden_pt_idx: FxHashSet<FilterPtObject<'a>>,
+    pub allowed_pt_idx: FxHashSet<FilterPtObject<'a>>,
 }
 
-impl DataFilter {
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum FilterPtObject<'a> {
+    StopPoint(&'a str),
+    StopArea(&'a str),
+    Line(&'a str),
+    Route(&'a str),
+    Network(&'a str),
+    PhysicalMode(&'a str),
+    CommercialMode(&'a str),
+}
+
+impl<'filter> DataFilter<'filter> {
     pub fn is_empty(&self) -> bool {
         self.forbidden_sp_idx.is_empty()
             && self.allowed_sp_idx.is_empty()
             && self.forbidden_vj_idx.is_empty()
             && self.allowed_vj_idx.is_empty()
+            && self.forbidden_pt_idx.is_empty()
+            && self.allowed_pt_idx.is_empty()
     }
     pub fn is_sp_allowed(&self, stop_idx: Idx<StopPoint>) -> bool {
         if self.allowed_sp_idx.is_empty() {
@@ -82,14 +99,67 @@ impl DataFilter {
             self.allowed_vj_idx.contains(&vj_idx) && !self.forbidden_vj_idx.contains(&vj_idx)
         }
     }
+
+    pub fn is_vj_allowedV2(&self, model: &Model, vj_idx: Idx<VehicleJourney>) -> bool {
+        let mut allowed = true;
+        for filter_pt in &self.forbidden_pt_idx {
+            match filter_pt {
+                FilterPtObject::CommercialMode(str) => {
+                    let vj = &model.vehicle_journeys[vj_idx];
+                    if &vj.physical_mode_id == str {
+                        allowed = false;
+                        break;
+                    }
+                }
+                FilterPtObject::PhysicalMode(str) => {
+                    let vj = &model.vehicle_journeys[vj_idx];
+                    if &vj.physical_mode_id == str {
+                        allowed = false;
+                        break;
+                    }
+                }
+                FilterPtObject::Route(str) => {
+                    let vj = &model.vehicle_journeys[vj_idx];
+                    if &vj.route_id == str {
+                        allowed = false;
+                        break;
+                    }
+                }
+                FilterPtObject::Line(str) => {
+                    let vj = &model.vehicle_journeys[vj_idx];
+                    let route_id = &vj.route_id;
+                    if let Some(route) = model.routes.get(route_id) {
+                        if &route.line_id == str {
+                            allowed = false;
+                            break;
+                        }
+                    }
+                }
+                FilterPtObject::Network(str) => {
+                    let vj = &model.vehicle_journeys[vj_idx];
+                    let route_id = &vj.route_id;
+                    if let Some(route) = model.routes.get(route_id) {
+                        if let Some(line) = model.lines.get(&route.line_id) {
+                            if &line.network_id == str {
+                                allowed = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+        allowed
+    }
 }
 
-pub struct TransitDataFiltered<'data, Timetables: TimetablesTrait> {
+pub struct TransitDataFiltered<'data, 'filter, Timetables: TimetablesTrait> {
     pub transit_data: &'data TransitData<Timetables>,
-    pub filters: DataFilter,
+    pub filters: DataFilter<'filter>,
 }
 
-impl<'data, Timetables: TimetablesTrait> TransitDataFiltered<'data, Timetables> {
+impl<'data, 'filter, Timetables: TimetablesTrait> TransitDataFiltered<'data, 'filter, Timetables> {
     pub fn stop_data(&self, stop: &Stop) -> &StopData<Timetables> {
         &self.transit_data.stops_data[stop.idx]
     }
@@ -98,7 +168,7 @@ impl<'data, Timetables: TimetablesTrait> TransitDataFiltered<'data, Timetables> 
         self.transit_data.stop_point_idx_to_stop.get(stop_point_idx)
     }
 
-    pub fn new(data: &'data TransitData<Timetables>, filters: DataFilter) -> Self {
+    pub fn new(data: &'data TransitData<Timetables>, filters: DataFilter<'filter>) -> Self {
         Self {
             transit_data: data,
             filters,
@@ -107,7 +177,7 @@ impl<'data, Timetables: TimetablesTrait> TransitDataFiltered<'data, Timetables> 
 }
 
 impl<Timetables: TimetablesTrait> data_interface::TransitTypes
-    for TransitDataFiltered<'_, Timetables>
+    for TransitDataFiltered<'_, '_, Timetables>
 {
     type Stop = Stop;
     type Mission = Timetables::Mission;
@@ -116,7 +186,7 @@ impl<Timetables: TimetablesTrait> data_interface::TransitTypes
     type Transfer = Transfer;
 }
 
-impl<Timetables: TimetablesTrait> data_interface::Data for TransitDataFiltered<'_, Timetables>
+impl<Timetables: TimetablesTrait> data_interface::Data for TransitDataFiltered<'_, '_, Timetables>
 where
     Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
 {
@@ -226,6 +296,7 @@ where
 
     fn earliest_trip_to_board_at(
         &self,
+        model: &Model,
         waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
         mission: &Self::Mission,
         position: &Self::Position,
@@ -242,7 +313,7 @@ where
                     position,
                     |vehicle_data: &Timetables::VehicleData| {
                         let vj_idx = vehicle_data.get_vehicle_journey_idx();
-                        self.filters.is_vj_allowed(vj_idx)
+                        self.filters.is_vj_allowedV2(model, vj_idx)
                     },
                 )
         } else {
@@ -252,6 +323,7 @@ where
 
     fn latest_trip_that_debark_at(
         &self,
+        model: &Model,
         waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
         mission: &Self::Mission,
         position: &Self::Position,
@@ -268,7 +340,7 @@ where
                     position,
                     |vehicle_data: &Timetables::VehicleData| {
                         let vj_idx = vehicle_data.get_vehicle_journey_idx();
-                        self.filters.is_vj_allowed(vj_idx)
+                        self.filters.is_vj_allowedV2(model, vj_idx)
                     },
                 )
         } else {
@@ -338,7 +410,7 @@ where
     }
 }
 
-impl<'a, Timetables> data_interface::DataIters<'a> for TransitDataFiltered<'_, Timetables>
+impl<'a, Timetables> data_interface::DataIters<'a> for TransitDataFiltered<'_, '_, Timetables>
 where
     Timetables: TimetablesTrait + for<'b> TimetablesIter<'b> + Debug,
     Timetables::Mission: 'a,
@@ -370,7 +442,7 @@ where
     }
 }
 
-impl<Timetables> data_interface::DataWithIters for TransitDataFiltered<'_, Timetables>
+impl<Timetables> data_interface::DataWithIters for TransitDataFiltered<'_, '_, Timetables>
 where
     Timetables: TimetablesTrait + for<'a> TimetablesIter<'a> + Debug,
     Timetables::Mission: 'static,

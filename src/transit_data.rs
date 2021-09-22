@@ -198,6 +198,7 @@ where
 
     fn earliest_trip_to_board_at(
         &self,
+        _: &Model,
         waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
         mission: &Self::Mission,
         position: &Self::Position,
@@ -208,6 +209,7 @@ where
 
     fn latest_trip_that_debark_at(
         &self,
+        model: &Model,
         waiting_time: &crate::time::SecondsSinceDatasetUTCStart,
         mission: &Self::Mission,
         position: &Self::Position,
