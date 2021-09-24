@@ -37,15 +37,32 @@
 fn main() {
     // create rust usable structs from protobuf files
     // see https://docs.rs/prost-build/0.6.1/prost_build/
+
+    use std::env;
+    let out_dir = env::var("OUT_DIR").unwrap();
+
     prost_build::compile_protos(
         &[
             "navitia-proto/request.proto",
             "navitia-proto/response.proto",
+            "navitia-proto/task.proto",
+            "navitia-proto/type.proto",
         ],
         &["navitia-proto/"],
     )
     .unwrap();
-    use std::env;
-    let out_dir = env::var("OUT_DIR").unwrap();
     println!("Writing protobuf code in {}/pbnavitia.rs", out_dir);
+
+    prost_build::compile_protos(
+        &[
+            "chaos-proto/gtfs-realtime.proto",
+            "chaos-proto/chaos.proto",
+            "chaos-proto/kirin.proto",
+        ],
+        &["chaos-proto/"],
+    )
+    .unwrap();
+    println!("Writing protobuf code in {}/transit_realtime.rs", out_dir);
+    println!("Writing protobuf code in {}/chaos.rs", out_dir);
+    println!("Writing protobuf code in {}/kirin.rs", out_dir);
 }

@@ -39,6 +39,7 @@ pub mod navitia_proto {
 }
 
 // pub mod navitia_proto;
+mod realtime;
 mod response;
 
 use launch::{
@@ -63,6 +64,7 @@ use failure::{bail, format_err, Error};
 
 use std::convert::TryFrom;
 
+use crate::realtime::{BrockerConfig, RealTimeWorker};
 use launch::datetime::DateTimeRepresent;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -116,6 +118,10 @@ pub struct Config {
     #[serde(flatten)]
     #[structopt(flatten)]
     request_default_params: config::RequestParams,
+
+    #[serde(flatten)]
+    #[structopt(flatten)]
+    brocker_params: BrockerConfig,
 }
 
 fn main() {

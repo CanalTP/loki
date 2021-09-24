@@ -34,41 +34,7 @@
 // https://groups.google.com/d/forum/navitia
 // www.navitia.io
 
-extern crate static_assertions;
+#[derive(Default)]
+pub struct RealTimeMessage {}
 
-mod engine;
-pub mod loads_data;
-pub mod request;
-pub mod time;
-pub mod timetables;
-mod transit_data;
-pub mod transit_data_filtered;
-mod transit_data_realtime;
-
-pub use chrono::{self, NaiveDateTime};
-pub use chrono_tz;
-pub use time::PositiveDuration;
-pub use tracing;
-pub use transit_model;
-pub use typed_index_collection;
-
-pub use transit_data::data_interface::{Data as DataTrait, DataIO, DataUpdate, DataWithIters};
-
-pub type DailyData = timetables::DailyTimetables;
-pub type PeriodicData = timetables::PeriodicTimetables;
-pub type PeriodicSplitVjData = timetables::PeriodicSplitVjByTzTimetables;
-
-pub use loads_data::LoadsData;
-
-pub use transit_data::{Idx, StopPoint, TransitData, TransitModelTransfer, VehicleJourney};
-
-pub use engine::engine_interface::{
-    BadRequest, Request as RequestTrait, RequestDebug, RequestIO, RequestInput, RequestTypes,
-    RequestWithIters,
-};
-
-pub use engine::multicriteria_raptor::MultiCriteriaRaptor;
-
-pub mod response;
-
-pub type Response = response::Response;
+pub fn handle_realtime(message: &RealTimeMessage) {}
